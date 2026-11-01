@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "macrostudio",
+  "version": "${version}",
+  "name": "Macro Studio MAX 2.2",
+  "description": "Client macros, precise mining controls, inventory convenience and custom UI.",
+  "authors": [
+    "Claude"
+  ],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.macrostudio.MacroStudioMod"
+    ]
+  },
+  "mixins": [
+    {
+      "config": "macrostudio.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
