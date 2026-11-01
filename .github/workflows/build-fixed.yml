@@ -1,0 +1,40 @@
+name: Macro Studio archive verification
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Unpack uploaded Macro Studio archive
+        run: |
+          set -euo pipefail
+          test -f Macro-Studio-GitHub-1.21.11.zip || { echo 'Archive is missing from repository root'; exit 1; }
+          mkdir -p work
+          unzip -q Macro-Studio-GitHub-1.21.11.zip -d work
+          test -f work/scripts/verify-core.sh
+          test -f work/macro-studio-1.0.0.jar
+
+      - name: Compile and smoke-test standalone core
+        run: bash work/scripts/verify-core.sh
+
+      - name: Publish existing (unmodified) mod JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: macro-studio-original-jar
+          path: work/macro-studio-1.0.0.jar
+          if-no-files-found: error
