@@ -49,6 +49,10 @@ jobs:
           done
           echo "Unpacked project successfully"
 
+      - name: Apply Mining Studio redesign and smooth turning
+        shell: bash
+        run: python3 overrides/apply-mining.py work
+
       - name: Build with Gradle
         shell: bash
         working-directory: work
