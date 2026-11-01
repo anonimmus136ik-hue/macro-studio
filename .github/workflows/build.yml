@@ -1,34 +1,89 @@
-name: build
+name: Build Macro Studio 1.21.11
+
 on:
   push:
+  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 25
-      - name: Unpack project
-        run: unzip -q project.zip -d work
-      - name: Build
+          java-version: '21'
+
+      - name: Find and unpack Gradle project
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Repository files:"
+          ls -lah
+          if [[ -f project.zip ]]; then
+            echo "Using project.zip from repository root"
+            cp project.zip "$RUNNER_TEMP/macrostudio-project.zip"
+          elif [[ -f MacroStudio-GitHub-Ready.zip ]]; then
+            echo "Using project.zip inside MacroStudio-GitHub-Ready.zip"
+            unzip -tq MacroStudio-GitHub-Ready.zip
+            unzip -p MacroStudio-GitHub-Ready.zip project.zip > "$RUNNER_TEMP/macrostudio-project.zip"
+          else
+            echo "::error::Neither project.zip nor MacroStudio-GitHub-Ready.zip exists in the repository root."
+            exit 1
+          fi
+          unzip -tq "$RUNNER_TEMP/macrostudio-project.zip"
+          mkdir -p work
+          unzip -q "$RUNNER_TEMP/macrostudio-project.zip" -d work
+          for required in build.gradle settings.gradle gradle.properties gradlew gradle/wrapper/gradle-wrapper.jar; do
+            if [[ ! -f "work/$required" ]]; then
+              echo "::error::Missing $required in project archive"
+              exit 1
+            fi
+          done
+          echo "Unpacked project successfully"
+
+      - name: Build with Gradle
+        shell: bash
         working-directory: work
         run: |
+          set -euo pipefail
           chmod +x gradlew
-          set -o pipefail
-          ./gradlew build --no-daemon 2>&1 | tee ../build.log
-      - name: Show errors
+          ./gradlew build --no-daemon --stacktrace 2>&1 | tee ../build.log
+
+      - name: Display build diagnostics
         if: failure()
+        shell: bash
         run: |
-          echo '### Ошибки компиляции' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E "error:" -A2 build.log | head -80 >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-      - uses: actions/upload-artifact@v4
+          if [[ -f build.log ]]; then
+            echo '### Last 120 build log lines' >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            tail -120 build.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Build did not start; inspect the unpack step.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload compiled mod
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
-          name: macro-studio
+          name: macro-studio-1.21.11
           path: |
             work/build/libs/*.jar
             !work/build/libs/*-sources.jar
+          if-no-files-found: error
+
+      - name: Upload diagnostics if build fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macro-studio-build-log
+          path: build.log
+          if-no-files-found: ignore
