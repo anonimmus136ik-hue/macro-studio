@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"package": "com.macrostudio.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"ClickMixin",
+		"KeyboardMixin",
+		"MouseMixin",
+		"CritMixin",
+		"RenderMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
