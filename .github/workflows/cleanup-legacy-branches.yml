@@ -1,0 +1,36 @@
+name: One-time removal of obsolete Macro Studio branches
+
+on:
+  push:
+    paths:
+      - .github/workflows/cleanup-legacy-branches.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Remove old development version branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          for branch in \
+            "feature/macro-studio-max-2-1" \
+            "fix/github-actions-nested-project" \
+            "upgrade/macro-studio-max-2-2"
+          do
+            if git ls-remote --exit-code origin "refs/heads/$branch" >/dev/null 2>&1; then
+              echo "Removing obsolete branch: $branch"
+              git push origin --delete "$branch"
+            else
+              echo "Already absent: $branch"
+            fi
+          done
