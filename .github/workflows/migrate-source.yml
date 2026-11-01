@@ -75,75 +75,6 @@ jobs:
           ''')
           print("Updated GUI version, saved-look selection and world-load confirmation")
           PY
-          cat > .github/workflows/build.yml <<'BUILD'
-          name: Build Macro Studio MAX 2.2.0
-          on:
-            push:
-            pull_request:
-            workflow_dispatch:
-          
-          permissions:
-            contents: read
-          
-          jobs:
-            build:
-              runs-on: ubuntu-24.04
-              steps:
-                - name: Checkout source
-                  uses: actions/checkout@v4
-          
-                - name: Set up Java 25 for Fabric Loom
-                  uses: actions/setup-java@v5
-                  with:
-                    distribution: temurin
-                    java-version: '25'
-          
-                - name: Verify single active version
-                  run: |
-                    set -euo pipefail
-                    test -f src/main/java/com/macrostudio/Digger.java
-                    test -f src/main/java/com/macrostudio/MacroStudioScreen.java
-                    grep -q '^mod_version=2.2.0$' gradle.properties
-                    test ! -f project.zip
-                    test ! -f MacroStudio-GitHub-Ready.zip
-                    echo "Macro Studio MAX 2.2.0 source tree confirmed"
-          
-                - name: Compile Fabric mod
-                  shell: bash
-                  run: |
-                    set -euo pipefail
-                    chmod +x gradlew
-                    ./gradlew clean build --no-daemon --stacktrace 2>&1 | tee build.log
-          
-                - name: Verify compiled mod JAR and version
-                  shell: bash
-                  run: |
-                    set -euo pipefail
-                    JAR=build/libs/macro-studio-2.2.0.jar
-                    test -f "$JAR"
-                    unzip -p "$JAR" fabric.mod.json | grep -q '"version": "2.2.0"'
-                    unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/Digger.class'
-                    unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/MacroStudioScreen.class'
-                    echo "Verified: $JAR"
-                    sha256sum "$JAR"
-          
-                - name: Upload the only current mod
-                  if: success()
-                  uses: actions/upload-artifact@v4
-                  with:
-                    name: MacroStudio-MAX-2.2.0
-                    path: build/libs/macro-studio-2.2.0.jar
-                    if-no-files-found: error
-                    retention-days: 30
-          
-                - name: Upload build log on failure
-                  if: failure()
-                  uses: actions/upload-artifact@v4
-                  with:
-                    name: MacroStudio-build-errors
-                    path: build.log
-                    if-no-files-found: ignore
-          BUILD
           cat > README.md <<'README'
           # Macro Studio MAX 2.2.0
           
@@ -171,7 +102,7 @@ jobs:
           
           A successful CI build confirms compilation, not successful use in Minecraft. Historical Git commits and old Actions logs remain accessible.
           README
-          rm -f -- project.zip MacroStudio-GitHub-Ready.zip README_MAX_RU.md .github/workflows/migrate-source.yml
+          rm -f -- project.zip MacroStudio-GitHub-Ready.zip README_MAX_RU.md
           rm -f -- overrides/apply-mining.py
           rmdir overrides 2>/dev/null || true
           git config user.name 'github-actions[bot]'
