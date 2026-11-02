@@ -1,16 +1,26 @@
-# Macro Studio MAX 2.3.0 — Obsidian Edition
+# Macro Studio MAX 2.4.0 — Obsidian Edition
 
 Fabric client-side mod for **Minecraft Java 1.21.11** (official Mojang mappings). This is the editable source, not a web mockup. The project still includes original MAX 2.2 macros, binds, assisted mining, auto tools, deposit, and HUD modules.
 
 ## How to build and install
 
-1. Open **Actions → Build Macro Studio MAX 2.3.0** on GitHub.
-2. Download the latest **successful** `MacroStudio-MAX-2.3.0` artifact.
-3. Extract `macro-studio-2.3.0.jar` from that ZIP.
+1. Open **Actions → Build Macro Studio MAX 2.4.0** on GitHub.
+2. Download the latest **successful** `MacroStudio-MAX-2.4.0` artifact.
+3. Extract `macro-studio-2.4.0.jar` from that ZIP.
 4. Put the JAR into the Fabric 1.21.11 instance's `mods` directory. Install the matching Fabric API, and remove older Macro Studio JARs.
 5. **Right Ctrl** opens the in-game menu, **F7** toggles macro recording and **F8** stops automation (default mappings, rebindable under Settings). The text **Obsidian Edition** at the top identifies this version.
 
 The Gradle wrapper uses Java 25 for Fabric Loom; the mod's class bytecode is Java 21.
+
+## Premium UI / Visual Atelier (v2.4.0)
+
+- **Checkbox tables**: true ON/OFF states with clickable, clearly labeled checkbox rows.
+- **Mouse wheel vertical scrolling** in each content page; viewport scissoring, only visible controls accept input, and a graphical scrollbar. Sidebar has independent wheel/page navigation. Settings are available even on low Minecraft GUI resolutions.
+- **Visual Atelier** contains 4 pages: World, HUD, 3D/Plan, Window. Each checkbox affects a real in-world renderer option.
+- **0 (zero)** toggles the entire world preview while Right Ctrl opens the configuration UI. Rebind 0 in Visual Atelier → Window.
+- **Red** selection volume and target boxes = proposed excavation. **Green** floor tiles and A* route = safe currently traversable positions. Adjust transparency (10-75) and drawing radius (8-48 blocks). The colored blueprint is not an ore-ESP.
+- **Real branded mod icon** embedded at `assets/macrostudio/icon.png`. Fabric Loader displays it using the `icon` entry in `fabric.mod.json`.
+- Credits in mod metadata are listed as `Macro Studio Contributors` and `anonimmus136ik-hue`, instead of the accidental generic icon / old assistant credit.
 
 ## Implemented in this branch
 
@@ -50,7 +60,9 @@ Save custom drill with **Smart Route → SAVE HELD AS DRILL** and choose a match
 
 ## Manual QA checklist
 
-- [ ] Right Ctrl opens and closes the UI at multiple GUI scales
+- [ ] Right Ctrl opens and closes the UI at multiple GUI scales; scroll wheel reaches every control, no visual overflow
+- [ ] Press 0 to toggle 3D preview, check green safe floor vs red proposed excavation volume, opacity/radius settings
+- [ ] Fabric Mods list shows custom emblem and updated contributor metadata
 - [ ] POS1 / POS2, Smart Route X/Z resize and Mine Up/Down show correct bounds
 - [ ] 3D selection and Active Layer appear in-world
 - [ ] Drill 3x3x2 preview updates in all 6 face directions
