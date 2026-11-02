@@ -689,7 +689,7 @@ public final class MacroStudioScreen extends Screen {
         line(g, "ATELIER UI  /  1.21.11", px + side + 15, py + 29, GOLD);
         line(g, Recorder.active ? "REC" : Digger.active ? (Digger.isPaused() ? "PAUSED" : "MINING") : "READY",
                 px + pw - 110, py + 19, Recorder.active ? RED : Digger.active ? TEAL : GREY);
-        line(g, "v2.3 PREVIEW", px + 15, py + ph - 20, GOLD);
+        line(g, "v2.3.0 PREVIEW", px + 15, py + ph - 20, GOLD);
         drawPage(g);
         // Custom skinned clickable widgets (native buttons are visually transparent).
         for (UiButton ui : paintedButtons) {
