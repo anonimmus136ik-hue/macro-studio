@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "macrostudio",
   "version": "${version}",
-  "name": "Macro Studio MAX 2.3 — Obsidian Edition",
-  "description": "Client macros, precise mining controls, inventory convenience and custom UI.",
+  "name": "Macro Studio MAX — Obsidian Edition",
+  "description": "Premium client-side utility interface: macros, 3D selection preview, assisted mining routes and configurable visual HUD.",
   "authors": [
-    "Claude"
+    "Macro Studio Contributors"
   ],
   "license": "MIT",
   "environment": "client",
@@ -25,5 +25,9 @@
     "minecraft": "~1.21.11",
     "java": ">=21",
     "fabric-api": "*"
-  }
+  },
+  "icon": "assets/macrostudio/icon.png",
+  "contributors": [
+    "anonimmus136ik-hue"
+  ]
 }
