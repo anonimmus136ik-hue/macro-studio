@@ -20,11 +20,24 @@ public final class Settings {
 	public int openKey = 345;
 	public int recordKey = -1;
 	public int stopKey = -1;
+	/** GLFW 0: start/cancel 3D selection in world. */
+	public int selectKey = 48;
 	public boolean recordArmed = false;
 	public Map<String, Integer> macroKeys = new LinkedHashMap<>();
 	public List<Bind> binds = new ArrayList<>();
 	public int[] dig1 = null;
 	public int[] dig2 = null;
+	/** Third right-click sets the other Y boundary; X/Z come from dig1/dig2. */
+	public int[] digHeightPoint = null;
+	/** Prevent accidentally using selection from a different dimension. */
+	public String digDimension = "";
+	public boolean digOverlay = true;
+	public boolean digSafeWalkPreview = true;
+	public boolean digTopDown = true;
+	public boolean digProtectContainers = true;
+	public boolean digStopOnDamage = false;
+	public boolean digStopOnLowHunger = false;
+	public boolean digHud = true;
 	public int digDepth = 2;
 	/** Maximum camera turn in degrees per client tick. */
 	public int digTurnSpeed = 6;
@@ -102,6 +115,7 @@ public final class Settings {
 					if (s.waypoints == null) s.waypoints = new ArrayList<>();
 					if (s.keepSlots == null || s.keepSlots.length != 36) s.keepSlots = defaultKeep();
 					if (s.fullCmd == null) s.fullCmd = "";
+					if (s.digDimension == null) s.digDimension = "";
 					if (s.backCmd == null) s.backCmd = "";
 					I = s;
 				}
@@ -124,6 +138,7 @@ public final class Settings {
 	public static Set<Integer> reservedKeys() {
 		Set<Integer> r = new HashSet<>();
 		r.add(I.openKey);
+		r.add(I.selectKey);
 		r.add(I.recordKey);
 		r.add(I.stopKey);
 		r.add(I.zoomKey);
