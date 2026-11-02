@@ -18,8 +18,8 @@ import java.util.Set;
 public final class Settings {
 	/** GLFW_KEY_RIGHT_CONTROL */
 	public int openKey = 345;
-	public int recordKey = -1;
-	public int stopKey = -1;
+	public int recordKey = 296; // GLFW F7
+	public int stopKey = 297; // GLFW F8
 	public boolean recordArmed = false;
 	public Map<String, Integer> macroKeys = new LinkedHashMap<>();
 	public List<Bind> binds = new ArrayList<>();
@@ -116,7 +116,12 @@ public final class Settings {
 			if (Files.exists(f)) {
 				Settings s = GSON.fromJson(Files.readString(f, StandardCharsets.UTF_8), Settings.class);
 				if (s != null) {
-					if (s.macroKeys == null) s.macroKeys = new LinkedHashMap<>();
+					// Migrate untouched 2.2 defaults while retaining customized keybinds.
+                    if (s.openKey == 345 && s.recordKey == -1 && s.stopKey == -1) {
+                        s.recordKey = 296;
+                        s.stopKey = 297;
+                    }
+                    if (s.macroKeys == null) s.macroKeys = new LinkedHashMap<>();
 					if (s.binds == null) s.binds = new ArrayList<>();
 					if (s.chests == null) s.chests = new ArrayList<>();
 					if (s.waypoints == null) s.waypoints = new ArrayList<>();
