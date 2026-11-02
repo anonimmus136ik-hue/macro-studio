@@ -45,6 +45,7 @@ public final class Settings {
     /** 0 floor, 1 walls, 2 fill. Preview only. */
     public int buildMode = 0;
     public boolean resourceHud = false;
+    public boolean mineSelectedOnly = false;
     public boolean marketAssistant = false;
     public int marketPrice = 400;
     public boolean[] resourceFilter = {true, true, true, true, true, true, true};
