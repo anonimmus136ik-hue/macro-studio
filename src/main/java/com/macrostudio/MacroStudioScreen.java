@@ -46,8 +46,14 @@ public final class MacroStudioScreen extends Screen {
     private Consumer<Integer> capture;
     private int px, py, pw, ph, side, cx, cy, cw, ch, rowStep;
     private int[] lookedPos;
+    private int scrollPx;
+    private int scrollMax;
+    private int scrollTop;
+    private int scrollBottom;
+    private int virtualBottom;
+    private boolean buildingContent;
 
-    private record UiButton(Button button, String caption, Tone tone) {}
+    private record UiButton(Button button, String caption, Tone tone, boolean content) {}
 
     public MacroStudioScreen() {
         super(Component.literal("Macro Studio MAX 2.2.0"));
@@ -86,13 +92,32 @@ public final class MacroStudioScreen extends Screen {
     }
 
     private Button button(String caption, int x, int y, int w, int h, Tone tone, Button.OnPress action) {
+        boolean fixedFooter = (tab == Tab.MACROS || tab == Tab.BINDS) && y >= cy + ch - 38;
+        boolean inContent = buildingContent && x >= cx && y >= scrollTop && !fixedFooter;
+        if (inContent) {
+            virtualBottom = Math.max(virtualBottom, y + h);
+            y -= scrollPx;
+            // Never register buttons that escape their scroll viewport. This also
+            // prevents invisible/out-of-frame widgets from catching mouse clicks.
+            if (y < scrollTop || y + h > scrollBottom) return null;
+        }
         Button b = Button.builder(Component.literal(caption), action).bounds(x, y, w, h).build();
         // Native button still receives mouse, keyboard and narration input.
         // Custom paint is drawn after the standard widget render.
         b.setAlpha(0.0f);
         addRenderableWidget(b);
-        paintedButtons.add(new UiButton(b, caption, tone));
+        paintedButtons.add(new UiButton(b, caption, tone, inContent));
         return b;
+    }
+
+    private void addContentEdit(EditBox e) {
+        if (buildingContent && tab != Tab.MACROS && tab != Tab.BINDS) {
+            int yy = e.getY();
+            virtualBottom = Math.max(virtualBottom, yy + e.getHeight());
+            e.setY(yy - scrollPx);
+            if (e.getY() < scrollTop || e.getY() + e.getHeight() > scrollBottom) return;
+        }
+        addRenderableWidget(e);
     }
 
     private void callAndRefresh(Runnable r) {
@@ -114,14 +139,20 @@ public final class MacroStudioScreen extends Screen {
         cw = px + pw - 11 - cx;
         ch = ph - 74;
         rowStep = Math.max(18, Math.min(30, (ph - 107) / NAV.length));
+        scrollTop = cy + (tab == Tab.MINING ? 93 : 33);
+        scrollBottom = cy + ch - 10;
+        virtualBottom = scrollTop;
+        scrollPx = Math.max(0, Math.min(scrollPx, scrollMax));
+        buildingContent = false;
 
         for (int i = 0; i < NAV.length; i++) {
             final Tab t = Tab.values()[i];
             button(NAV[i], px + 8, py + 68 + i * rowStep, side - 16,
                     Math.min(26, rowStep - 2), tab == t ? Tone.SELECTED : Tone.MUTED,
-                    b -> { tab = t; build(); });
+                    b -> { tab = t; scrollPx = 0; scrollMax = 0; build(); });
         }
         button("X", px + pw - 34, py + 13, 22, 22, Tone.DANGER, b -> onClose());
+        buildingContent = true;
         switch (tab) {
             case HOME -> home();
             case MINING -> mining();
@@ -133,6 +164,10 @@ public final class MacroStudioScreen extends Screen {
             case PERF -> performance();
             case SETTINGS -> settings();
         }
+        buildingContent = false;
+        scrollMax = (tab == Tab.MACROS || tab == Tab.BINDS) ? 0
+                : Math.max(0, virtualBottom - scrollBottom + 9);
+        scrollPx = Math.min(scrollPx, scrollMax);
     }
 
     private void home() {
@@ -290,7 +325,7 @@ public final class MacroStudioScreen extends Screen {
             box.setMaxLength(200);
             box.setValue(bd.lines == null ? "" : bd.lines);
             box.setResponder(v -> bd.lines = v);
-            addRenderableWidget(box);
+            addContentEdit(box);
             button("X", cx + cw - 39, yy, 24, 24, Tone.DANGER,
                     b -> callAndRefresh(() -> s.binds.remove(bd)));
         }
@@ -317,10 +352,10 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(s.chests::clear));
         EditBox before = new EditBox(font, x, y + 98, w, 20, Component.literal("Command when full"));
         before.setMaxLength(200); before.setValue(s.fullCmd); before.setResponder(v -> s.fullCmd = v);
-        addRenderableWidget(before);
+        addContentEdit(before);
         EditBox after = new EditBox(font, x, y + 151, w, 20, Component.literal("Return command"));
         after.setMaxLength(200); after.setValue(s.backCmd); after.setResponder(v -> s.backCmd = v);
-        addRenderableWidget(after);
+        addContentEdit(after);
         int gridWidth = Math.min(w, 9 * 24);
         int gap = gridWidth / 9;
         for (int row = 0; row < 4; row++) for (int col = 0; col < 9; col++) {
