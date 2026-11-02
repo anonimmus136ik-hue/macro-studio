@@ -20,21 +20,21 @@ import java.util.function.Consumer;
  * mouse handling. The visible skin is custom-rendered.
  */
 public final class MacroStudioScreen extends Screen {
-    private enum Tab { HOME, MINING, AUTO, MACROS, BINDS, DEPOSIT, VISUAL, PERF, SETTINGS }
+    private enum Tab { HOME, MINING, ROUTE, BUILD, MARKET, AUTO, MACROS, BINDS, DEPOSIT, VISUAL, PERF, SETTINGS }
     private enum Tone { NORMAL, PRIMARY, DANGER, MUTED, SELECTED }
 
-    private static final int BG = 0xFF090D16;
-    private static final int PANEL = 0xFF131D2C;
-    private static final int CARD = 0xFF1B283B;
-    private static final int BORDER = 0xFF2C3D51;
+    private static final int BG = 0xFF090E15;
+    private static final int PANEL = 0xFF121C27;
+    private static final int CARD = 0xFF182533;
+    private static final int BORDER = 0xFF2A4550;
     private static final int WHITE = 0xFFEAF5FF;
     private static final int GREY = 0xFF93A6BE;
-    private static final int TEAL = 0xFF58E2C5;
+    private static final int TEAL = 0xFF69E8BF;
     private static final int PURPLE = 0xFF9A8AFF;
     private static final int RED = 0xFFFF7184;
-    private static final int GOLD = 0xFFFFCE83;
+    private static final int GOLD = 0xFFD8BA80;
 
-    private static final String[] NAV = {"HOME", "MINING", "AUTOMATION", "MACROS", "BINDS", "DEPOSIT", "VISUAL", "PERFORMANCE", "SETTINGS"};
+    private static final String[] NAV = {"DASHBOARD", "MINING STUDIO", "SMART ROUTE", "BUILD STUDIO", "MARKET / ORES", "AUTOMATION", "MACROS", "BINDS", "DEPOSIT", "VISUAL", "PERFORMANCE", "SETTINGS"};
     private final List<UiButton> paintedButtons = new ArrayList<>();
     private Tab tab = Tab.MINING;
     private String selectedMacro;
@@ -50,7 +50,7 @@ public final class MacroStudioScreen extends Screen {
     private record UiButton(Button button, String caption, Tone tone) {}
 
     public MacroStudioScreen() {
-        super(Component.literal("Macro Studio MAX 2.2.0"));
+        super(Component.literal("Macro Studio | Obsidian Edition"));
         Minecraft mc = Minecraft.getInstance();
         if (mc.hitResult instanceof BlockHitResult hit && mc.hitResult.getType() == HitResult.Type.BLOCK) {
             lookedPos = new int[] {hit.getBlockPos().getX(), hit.getBlockPos().getY(), hit.getBlockPos().getZ()};
@@ -104,8 +104,8 @@ public final class MacroStudioScreen extends Screen {
     private void build() {
         clearWidgets();
         paintedButtons.clear();
-        pw = Math.max(280, Math.min(width - 12, 920));
-        ph = Math.max(210, Math.min(height - 10, 528));
+        pw = Math.max(190, Math.min(width - 12, Math.min(1100, width * Settings.I.uiWidthPercent / 100)));
+        ph = Math.max(170, Math.min(height - 10, Math.min(680, height * Settings.I.uiHeightPercent / 100)));
         px = (width - pw) / 2;
         py = (height - ph) / 2;
         side = Math.min(139, Math.max(102, pw / 5));
@@ -113,7 +113,7 @@ public final class MacroStudioScreen extends Screen {
         cy = py + 62;
         cw = px + pw - 11 - cx;
         ch = ph - 74;
-        rowStep = Math.max(18, Math.min(30, (ph - 107) / NAV.length));
+        rowStep = Math.max(14, Math.min(30, (ph - 101) / NAV.length));
 
         for (int i = 0; i < NAV.length; i++) {
             final Tab t = Tab.values()[i];
@@ -125,6 +125,9 @@ public final class MacroStudioScreen extends Screen {
         switch (tab) {
             case HOME -> home();
             case MINING -> mining();
+            case ROUTE -> routePanel();
+            case BUILD -> buildPanel();
+            case MARKET -> marketPanel();
             case AUTO -> automation();
             case MACROS -> macros();
             case BINDS -> binds();
@@ -198,6 +201,76 @@ public final class MacroStudioScreen extends Screen {
             button("CLEAR SELECTION", x, y + 244, w, 23, Tone.DANGER,
                     b -> callAndRefresh(Digger::clearSelection));
         }
+    }
+
+    private void routePanel() {
+        Settings s = Settings.I;
+        int x = cx + 12, y = cy + 41, w = Math.max(90, Math.min(340, cw - 24));
+        button(toggle("3D SELECTION OUTLINE", s.selectionVisuals), x, y, w, 26, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.selectionVisuals = !s.selectionVisuals));
+        button(toggle("ACTIVE LAYER", s.showActiveLayer), x, y + 33, w, 26, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.showActiveLayer = !s.showActiveLayer));
+        button(toggle("DRILL 3x3x2 PREVIEW", s.drillPreview), x, y + 66, w, 26, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.drillPreview = !s.drillPreview));
+        button(toggle("SAFE ROUTE LINES", s.showRoute), x, y + 99, w, 26, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.showRoute = !s.showRoute));
+        button("MINE " + (s.digUp ? "UP" : "DOWN") + "  [SWITCH]", x, y + 132, w, 27, Tone.SELECTED,
+                b -> callAndRefresh(() -> s.digUp = !s.digUp));
+        int half = Math.max(44, (w - 6) / 2);
+        button("X -", x, y + 204, half, 24, Tone.MUTED, b -> resizeAxis(0, -1));
+        button("X +", x + half + 6, y + 204, half, 24, Tone.MUTED, b -> resizeAxis(0, 1));
+        button("Z -", x, y + 233, half, 24, Tone.MUTED, b -> resizeAxis(2, -1));
+        button("Z +", x + half + 6, y + 233, half, 24, Tone.MUTED, b -> resizeAxis(2, 1));
+    }
+
+    private void resizeAxis(int axis, int delta) {
+        if (Digger.active || Settings.I.dig2 == null) {
+            Recorder.msg("Stop mining and set POS2 to resize");
+            return;
+        }
+        Settings.I.dig2[axis] += delta;
+        Settings.save();
+        build();
+    }
+
+    private void buildPanel() {
+        Settings s = Settings.I;
+        int x = cx + 12, y = cy + 44, w = Math.max(90, Math.min(340, cw - 24));
+        button(toggle("BUILD HOLOGRAM", s.buildPreview), x, y, w, 29, Tone.PRIMARY,
+                b -> callAndRefresh(() -> s.buildPreview = !s.buildPreview));
+        button("SHAPE: " + new String[]{"FLOOR", "WALLS", "FILL"}[s.buildMode % 3],
+                x, y + 38, w, 29, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.buildMode = (s.buildMode + 1) % 3));
+        button("OPEN SELECTION", x, y + 83, w, 27, Tone.NORMAL, b -> { tab = Tab.MINING; build(); });
+        button("EXPAND X", x, y + 127, w, 25, Tone.MUTED, b -> resizeAxis(0, 1));
+        button("EXPAND Z", x, y + 158, w, 25, Tone.MUTED, b -> resizeAxis(2, 1));
+    }
+
+    private void marketPanel() {
+        Settings s = Settings.I;
+        int x = cx + 12, y = cy + 38, w = Math.max(90, Math.min(380, cw - 24));
+        String[] ores = {"DIAMOND", "EMERALD", "GOLD", "IRON", "REDSTONE", "COAL", "STONE"};
+        int cellW = Math.max(62, (w - 8) / 2);
+        for (int i = 0; i < ores.length; i++) {
+            final int idx = i;
+            int row = i / 2, col = i % 2;
+            button((s.resourceFilter[i] ? "[x] " : "[ ] ") + ores[i], x + col * (cellW + 8), y + row * 31,
+                    cellW, 25, s.resourceFilter[i] ? Tone.SELECTED : Tone.MUTED,
+                    b -> callAndRefresh(() -> s.resourceFilter[idx] = !s.resourceFilter[idx]));
+        }
+        button("PRICE - 50", x, y + 155, cellW, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.marketPrice = Math.max(1, s.marketPrice - 50)));
+        button("PRICE + 50", x + cellW + 8, y + 155, cellW, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.marketPrice = Math.min(100000000, s.marketPrice + 50)));
+        button("COPY /market sell " + s.marketPrice, x, y + 195, w, 30, Tone.PRIMARY, b -> {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null || mc.player.getMainHandItem().getCount() < 64) {
+                Recorder.msg("Hold a complete 64-stack first");
+                return;
+            }
+            mc.keyboardHandler.setClipboard("/market sell " + s.marketPrice);
+            Recorder.msg("Command copied. Check price and confirm sale manually.");
+        });
     }
 
     private void automation() {
@@ -416,7 +489,16 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(() -> s.hpHearts = Math.max(1, s.hpHearts - 1)));
         button("HEALTH +", x + (w - 8) / 2 + 8, y + 151, Math.max(60, (w - 8) / 2), 26, Tone.MUTED,
                 b -> callAndRefresh(() -> s.hpHearts = Math.min(9, s.hpHearts + 1)));
-        button("SAVE SETTINGS", x, y + 199, w, 26, Tone.PRIMARY, b -> { Settings.save(); Recorder.msg("Настройки сохранены"); });
+        button("WINDOW WIDTH -", x, y + 199, Math.max(60,(w-8)/2), 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.uiWidthPercent = Math.max(55,s.uiWidthPercent-5)));
+        button("WINDOW WIDTH +", x + (w-8)/2 + 8, y + 199, Math.max(60,(w-8)/2), 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.uiWidthPercent = Math.min(96,s.uiWidthPercent+5)));
+        button("WINDOW HEIGHT -", x, y + 231, Math.max(60,(w-8)/2), 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.uiHeightPercent = Math.max(65,s.uiHeightPercent-5)));
+        button("WINDOW HEIGHT +", x + (w-8)/2 + 8, y + 231, Math.max(60,(w-8)/2), 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.uiHeightPercent = Math.min(97,s.uiHeightPercent+5)));
+        if (ch > 335) button("SAVE SETTINGS", x, y + 264, w, 26, Tone.PRIMARY,
+                b -> { Settings.save(); Recorder.msg("Settings saved"); });
     }
 
     private String keyLabel(String id, String prefix, int key) {
@@ -500,7 +582,7 @@ public final class MacroStudioScreen extends Screen {
                 line(g, "REPLAY: " + (Replayer.active ? "ACTIVE" : "IDLE"), x, y + 245, GREY);
             }
             case MINING -> {
-                line(g, "MINING STUDIO  /  ACTIVE CONTROLS", x, y, TEAL);
+                line(g, "MINING STUDIO  /  SELECT & PREVIEW", x, y, TEAL);
                 int ly = cy + 30;
                 int leftW = miningLeftWidth();
                 line(g, "POINT 1 / " + cut(point(Settings.I.dig1), Math.max(12, leftW / 6)), x, ly + 61, WHITE);
@@ -526,6 +608,23 @@ public final class MacroStudioScreen extends Screen {
                 if (!Digger.lastError().isEmpty() && ch >= 390) {
                     line(g, cut(Digger.lastError(), Math.max(30, cw / 6)), x, cy + ch - 18, RED);
                 }
+            }
+            case ROUTE -> {
+                line(g, "SMART ROUTE  /  3D GIZMOS", x, y, TEAL);
+                line(g, "Overlay: native Minecraft lines, no X-Ray.", x, y + 25, GREY);
+                line(g, "Route: safe horizontal A* / avoid gaps.", x, y + 162, GREY);
+                line(g, "Mining direction: " + (Settings.I.digUp ? "UP" : "DOWN"), x, y + 183, GOLD);
+            }
+            case BUILD -> {
+                line(g, "BUILD STUDIO  /  HOLOGRAM", x, y, BLUE);
+                line(g, "Preview only: no block placement packets.", x, y + 27, GREY);
+                line(g, "Mode: " + new String[]{"FLOOR","WALLS","FILL"}[Settings.I.buildMode % 3], x, y + 108, GOLD);
+            }
+            case MARKET -> {
+                line(g, "RESOURCE FILTER  /  MARKET ASSISTANT", x, y, TEAL);
+                line(g, "Only loaded inventory items; no ore ESP.", x, y + 22, GREY);
+                line(g, "Price: " + Settings.I.marketPrice + "  |  Hold a complete 64 stack.", x, y + 207, GOLD);
+                line(g, "Copy command, confirm in chat yourself.", x, y + 268, GREY);
             }
             case AUTO -> {
                 line(g, "AUTOMATION / INSTALLED MODULES", x, y, TEAL);
@@ -567,11 +666,11 @@ public final class MacroStudioScreen extends Screen {
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
         line(g, "M", px + 16, py + 18, TEAL);
-        line(g, "MACRO STUDIO", px + side + 15, py + 16, WHITE);
-        line(g, "MAX 2.2  /  1.21.11", px + side + 15, py + 29, GREY);
+        line(g, "MACRO STUDIO  //  OBSIDIAN", px + side + 15, py + 16, WHITE);
+        line(g, "ATELIER UI  /  1.21.11", px + side + 15, py + 29, GOLD);
         line(g, Recorder.active ? "REC" : Digger.active ? (Digger.isPaused() ? "PAUSED" : "MINING") : "READY",
                 px + pw - 110, py + 19, Recorder.active ? RED : Digger.active ? TEAL : GREY);
-        line(g, "v2.2.0", px + 15, py + ph - 20, GREY);
+        line(g, "v2.3 PREVIEW", px + 15, py + ph - 20, GOLD);
         drawPage(g);
         // Custom skinned clickable widgets (native buttons are visually transparent).
         for (UiButton ui : paintedButtons) {
@@ -579,11 +678,11 @@ public final class MacroStudioScreen extends Screen {
             int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
             boolean hot = b.isHoveredOrFocused();
             int bg = switch (ui.tone()) {
-                case PRIMARY -> hot ? 0xFF78FFDA : 0xFF35B7A6;
+                case PRIMARY -> hot ? 0xFF89F3D0 : 0xFF168F70;
                 case DANGER -> hot ? 0xFFFF8498 : 0xFF8B354D;
                 case SELECTED -> hot ? 0xFF41677B : 0xFF2A5066;
                 case MUTED -> hot ? 0xFF34445E : 0xFF202C40;
-                case NORMAL -> hot ? 0xFF38526A : 0xFF29384D;
+                case NORMAL -> hot ? 0xFF2D6A65 : 0xFF243C47;
             };
             rounded(g, x, y, w, h, hot ? 0xFF9AD5DE : BORDER);
             rounded(g, x + 1, y + 1, w - 2, h - 2, bg);
