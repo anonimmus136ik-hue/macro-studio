@@ -67,9 +67,9 @@ public class MacroStudioMod implements ClientModInitializer {
 				Recorder.stop();
 				s.recordArmed = false;
 				Settings.save();
-			} else if (s.recordArmed) {
-				Recorder.start();
-			}
+			} else {
+                Recorder.start();
+            }
 			return;
 		}
 		if (code == s.stopKey) {
