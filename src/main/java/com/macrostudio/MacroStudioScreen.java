@@ -277,9 +277,21 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(() -> s.marketPrice = Math.max(1, s.marketPrice - 50)));
         button("PRICE + 50", x + cellW + 8, y + 155, cellW, 26, Tone.MUTED,
                 b -> callAndRefresh(() -> s.marketPrice = Math.min(100000000, s.marketPrice + 50)));
-        button(toggle("INVENTORY ORE HUD", s.resourceHud), x, y + 225, w, 25, Tone.NORMAL,
+        button(toggle("INVENTORY ORE HUD", s.resourceHud), x, y + 250, w, 25, Tone.NORMAL,
                 b -> callAndRefresh(() -> s.resourceHud = !s.resourceHud));
-        button("COPY /market sell " + s.marketPrice, x, y + 195, w, 30, Tone.PRIMARY, b -> {
+        EditBox price = new EditBox(font, x, y + 187, w, 18, Component.literal("Exact sale price"));
+        price.setMaxLength(9);
+        price.setValue(String.valueOf(s.marketPrice));
+        price.setResponder(value -> {
+            try {
+                int entered = Integer.parseInt(value);
+                if (entered > 0 && entered <= 100000000) s.marketPrice = entered;
+            } catch (NumberFormatException ignored) {
+                // Keep last valid value while the user is editing.
+            }
+        });
+        addRenderableWidget(price);
+        button("COPY /market sell " + s.marketPrice, x, y + 213, w, 30, Tone.PRIMARY, b -> {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player == null || mc.player.getMainHandItem().getCount() < 64) {
                 Recorder.msg("Hold a complete 64-stack first");
@@ -641,8 +653,8 @@ public final class MacroStudioScreen extends Screen {
             case MARKET -> {
                 line(g, "RESOURCE FILTER  /  MARKET ASSISTANT", x, y, TEAL);
                 line(g, "Only loaded inventory items; no ore ESP.", x, y + 22, GREY);
-                line(g, "Price: " + Settings.I.marketPrice + "  |  Hold a complete 64 stack.", x, y + 207, GOLD);
-                line(g, "Copy command, confirm in chat yourself.", x, y + 268, GREY);
+                line(g, "Price: " + Settings.I.marketPrice + "  |  Exact price below.", x, y + 188, GOLD);
+                line(g, "Hold 64 items; confirm in chat manually.", x, y + 285, GREY);
             }
             case AUTO -> {
                 line(g, "AUTOMATION / INSTALLED MODULES", x, y, TEAL);
