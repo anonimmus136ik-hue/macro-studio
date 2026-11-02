@@ -91,7 +91,7 @@ public final class SmartPath {
         Result best = new Result(List.of(), "NO SAFE REACHABLE STAND");
         boolean onColumn = mc.player.blockPosition().getX() == x && mc.player.blockPosition().getZ() == z;
         for (int[] offset : new int[][] {{0,0},{1,0},{-1,0},{0,1},{0,-1},{2,0},{-2,0},{0,2},{0,-2}}) {
-            if (onColumn && offset[0] == 0 && offset[1] == 0) continue;
+            if ((onColumn || target.getY() < y) && offset[0] == 0 && offset[1] == 0) continue;
             BlockPos stand = new BlockPos(x + offset[0], y, z + offset[1]);
             if (!visibleFrom(mc, stand, target)) continue;
             Result candidate = plan(mc, stand);
