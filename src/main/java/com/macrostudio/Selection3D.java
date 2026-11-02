@@ -241,9 +241,9 @@ public final class Selection3D {
         float d=(float)Math.sqrt(dx*dx+dy*dy+dz*dz);
         if(d<0.00001f) return;
         float nx=dx/d, ny=dy/d, nz=dz/d;
-        v.vertex((float)(x1-camera.x),(float)(y1-camera.y),(float)(z1-camera.z))
-                .color(r,g,b,a).normal(nx,ny,nz).lineWidth(1.7f);
-        v.vertex((float)(x2-camera.x),(float)(y2-camera.y),(float)(z2-camera.z))
-                .color(r,g,b,a).normal(nx,ny,nz).lineWidth(1.7f);
+        v.addVertex((float)(x1-camera.x),(float)(y1-camera.y),(float)(z1-camera.z))
+                .setColor(r,g,b,a).setNormal(nx,ny,nz).setLineWidth(1.7f);
+        v.addVertex((float)(x2-camera.x),(float)(y2-camera.y),(float)(z2-camera.z))
+                .setColor(r,g,b,a).setNormal(nx,ny,nz).setLineWidth(1.7f);
     }
 }
