@@ -43,13 +43,16 @@ public final class MacroStudioScreen extends Screen {
     private int macroPage = 0;
     private int bindsPage = 0;
     private int navPage = 0;
-    private int visualPage = 0;
+    private int visualPage = 2;
+    private int scrollOffset = 0;
+    private int contentBottomRaw = 0;
+    private int maxScroll = 0;
     private String captureId;
     private Consumer<Integer> capture;
     private int px, py, pw, ph, side, cx, cy, cw, ch, rowStep;
     private int[] lookedPos;
 
-    private record UiButton(Button button, String caption, Tone tone) {}
+    private record UiButton(Button button, String caption, Tone tone, boolean content) {}
 
     public MacroStudioScreen() {
         super(Component.literal("Macro Studio | Obsidian Edition"));
@@ -88,13 +91,27 @@ public final class MacroStudioScreen extends Screen {
     }
 
     private Button button(String caption, int x, int y, int w, int h, Tone tone, Button.OnPress action) {
-        Button b = Button.builder(Component.literal(caption), action).bounds(x, y, w, h).build();
-        // Native button still receives mouse, keyboard and narration input.
-        // Custom paint is drawn after the standard widget render.
-        b.setAlpha(0.0f);
-        addRenderableWidget(b);
-        paintedButtons.add(new UiButton(b, caption, tone));
-        return b;
+        boolean content = x >= cx && y >= cy && x < cx + cw;
+        if (content) {
+            contentBottomRaw = Math.max(contentBottomRaw, y + h + 8);
+            y -= scrollOffset;
+        }
+        Button widget = Button.builder(Component.literal(caption), action)
+                .bounds(x, y, Math.max(16,w), Math.max(14,h)).build();
+        widget.setAlpha(0.0f);
+        if (content) widget.visible = y >= cy + 2 && y + h <= cy + ch - 5;
+        addRenderableWidget(widget);
+        paintedButtons.add(new UiButton(widget, caption, tone, content));
+        return widget;
+    }
+
+    /** Text fields scroll with the same viewport as all other controls. */
+    private void addField(EditBox field) {
+        int rawY = field.getY();
+        contentBottomRaw = Math.max(contentBottomRaw, rawY + field.getHeight() + 8);
+        field.setY(rawY - scrollOffset);
+        field.visible = field.getY() >= cy + 2 && field.getY() + field.getHeight() <= cy + ch - 5;
+        addRenderableWidget(field);
     }
 
     private void callAndRefresh(Runnable r) {
@@ -106,11 +123,12 @@ public final class MacroStudioScreen extends Screen {
     private void build() {
         clearWidgets();
         paintedButtons.clear();
-        pw = Math.max(190, Math.min(width - 12, Math.min(1100, width * Settings.I.uiWidthPercent / 100)));
-        ph = Math.max(170, Math.min(height - 10, Math.min(680, height * Settings.I.uiHeightPercent / 100)));
+        contentBottomRaw = 0;
+        pw = Math.min(Math.max(150, width - 8), Math.max(150, Math.min(1100, width * Settings.I.uiWidthPercent / 100)));
+        ph = Math.min(Math.max(130, height - 8), Math.max(130, Math.min(680, height * Settings.I.uiHeightPercent / 100)));
         px = (width - pw) / 2;
         py = (height - ph) / 2;
-        side = Math.min(139, Math.max(102, pw / 5));
+        side = Math.min(142, Math.max(78, pw / 5));
         cx = px + side + 13;
         cy = py + 62;
         cw = px + pw - 11 - cx;
@@ -127,7 +145,7 @@ public final class MacroStudioScreen extends Screen {
             final Tab t = Tab.values()[i];
             button(NAV[i], px + 8, py + 67 + local * tabStep, side - 16,
                     tabHeight, tab == t ? Tone.SELECTED : Tone.MUTED,
-                    b -> { tab = t; build(); });
+                    b -> { tab = t; scrollOffset = 0; build(); });
         }
         if (NAV.length > navRows) {
             button("<", px + 8, py + ph - 52, Math.max(28, (side-22)/2), 23, Tone.MUTED,
@@ -150,6 +168,22 @@ public final class MacroStudioScreen extends Screen {
             case VISUAL -> visuals();
             case PERF -> performance();
             case SETTINGS -> settings();
+        }
+        int suggestedBottom = cy + switch (tab) {
+            case ROUTE -> 440;
+            case MARKET -> 375;
+            case MINING -> 370;
+            case AUTO -> 355;
+            case SETTINGS -> 365;
+            case VISUAL -> (visualPage == 2 ? 530 : 365);
+            case DEPOSIT -> 400;
+            default -> 320;
+        };
+        contentBottomRaw = Math.max(contentBottomRaw, suggestedBottom);
+        maxScroll = Math.max(0, contentBottomRaw - (cy + ch - 5));
+        if (scrollOffset > maxScroll) {
+            scrollOffset = maxScroll;
+            build();
         }
     }
 
@@ -212,7 +246,7 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(() -> Settings.I.digTurnSpeed = Math.max(2, Settings.I.digTurnSpeed - 1)));
         button("TURN +", x + half + 5, y + 211, half, 23, Tone.MUTED,
                 b -> callAndRefresh(() -> Settings.I.digTurnSpeed = Math.min(20, Settings.I.digTurnSpeed + 1)));
-        if (y + 266 < cy + ch) {
+        {
             button("CLEAR SELECTION", x, y + 244, w, 23, Tone.DANGER,
                     b -> callAndRefresh(Digger::clearSelection));
         }
@@ -236,7 +270,7 @@ public final class MacroStudioScreen extends Screen {
         button("X +", x + half + 6, y + 204, half, 24, Tone.MUTED, b -> resizeAxis(0, 1));
         button("Z -", x, y + 233, half, 24, Tone.MUTED, b -> resizeAxis(2, -1));
         button("Z +", x + half + 6, y + 233, half, 24, Tone.MUTED, b -> resizeAxis(2, 1));
-        if (ch >= 355) {
+        {
             button(toggle("DRILL TOOL ASSIST", s.drillAssist), x, y + 266, w, 24,
                     Tone.NORMAL, b -> callAndRefresh(() -> s.drillAssist = !s.drillAssist));
             button("SAVE HELD AS DRILL", x, y + 295, w, 24, Tone.MUTED,
@@ -287,7 +321,7 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(() -> s.marketPrice = Math.min(100000000, s.marketPrice + 50)));
         button(toggle("INVENTORY ORE HUD", s.resourceHud), x, y + 250, w, 25, Tone.NORMAL,
                 b -> callAndRefresh(() -> s.resourceHud = !s.resourceHud));
-        if (ch >= 347) {
+        {
             button(toggle("MINE SELECTED ORES ONLY", s.mineSelectedOnly), x, y + 280, w, 25,
                     Tone.NORMAL, b -> callAndRefresh(() -> s.mineSelectedOnly = !s.mineSelectedOnly));
         }
@@ -302,7 +336,7 @@ public final class MacroStudioScreen extends Screen {
                 // Keep last valid value while the user is editing.
             }
         });
-        addRenderableWidget(price);
+        addField(price);
         button("COPY VERIFIED SALE COMMAND", x, y + 213, w, 30, Tone.PRIMARY, b -> {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player == null || !ResourceCatalog.eligibleForMarket(mc.player.getMainHandItem())) {
@@ -376,14 +410,14 @@ public final class MacroStudioScreen extends Screen {
             e.setMaxLength(32);
             e.setValue(rename.isEmpty() ? chosen : rename);
             e.setResponder(v -> rename = v);
-            addRenderableWidget(e);
+            addField(e);
             button("RENAME", rx, y + 187, rw, 23, Tone.MUTED, b -> {
                 String n = Macros.sanitize(rename.isEmpty() ? chosen : rename);
                 if (!n.isEmpty() && Macros.rename(chosen, n)) selectedMacro = n;
                 rename = "";
                 build();
             });
-            if (ch > 310) button("DELETE MACRO", rx, y + 217, rw, 24, Tone.DANGER,
+            button("DELETE MACRO", rx, y + 217, rw, 24, Tone.DANGER,
                     b -> { Macros.delete(chosen); selectedMacro = null; build(); });
         }
     }
@@ -404,7 +438,7 @@ public final class MacroStudioScreen extends Screen {
             box.setMaxLength(200);
             box.setValue(bd.lines == null ? "" : bd.lines);
             box.setResponder(v -> bd.lines = v);
-            addRenderableWidget(box);
+            addField(box);
             button("X", cx + cw - 39, yy, 24, 24, Tone.DANGER,
                     b -> callAndRefresh(() -> s.binds.remove(bd)));
         }
@@ -431,10 +465,10 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(s.chests::clear));
         EditBox before = new EditBox(font, x, y + 98, w, 20, Component.literal("Command when full"));
         before.setMaxLength(200); before.setValue(s.fullCmd); before.setResponder(v -> s.fullCmd = v);
-        addRenderableWidget(before);
+        addField(before);
         EditBox after = new EditBox(font, x, y + 151, w, 20, Component.literal("Return command"));
         after.setMaxLength(200); after.setValue(s.backCmd); after.setResponder(v -> s.backCmd = v);
-        addRenderableWidget(after);
+        addField(after);
         int gridWidth = Math.min(w, 9 * 24);
         int gap = gridWidth / 9;
         for (int row = 0; row < 4; row++) for (int col = 0; col < 9; col++) {
@@ -538,7 +572,7 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(() -> s.uiHeightPercent = Math.max(65,s.uiHeightPercent-5)));
         button("WINDOW HEIGHT +", x + (w-8)/2 + 8, y + 231, Math.max(60,(w-8)/2), 26, Tone.MUTED,
                 b -> callAndRefresh(() -> s.uiHeightPercent = Math.min(97,s.uiHeightPercent+5)));
-        if (ch > 335) button("SAVE SETTINGS", x, y + 264, w, 26, Tone.PRIMARY,
+        button("SAVE SETTINGS", x, y + 264, w, 26, Tone.PRIMARY,
                 b -> { Settings.save(); Recorder.msg("Settings saved"); });
     }
 
@@ -575,6 +609,26 @@ public final class MacroStudioScreen extends Screen {
             return true;
         }
         return super.keyPressed(event);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+        if (mouseX >= cx && mouseX <= cx + cw && mouseY >= cy && mouseY <= cy + ch) {
+            int next = Math.max(0, Math.min(maxScroll, scrollOffset - (int) Math.round(vertical * 29)));
+            if (next != scrollOffset) {
+                scrollOffset = next;
+                build();
+            }
+            return true;
+        }
+        if (mouseX >= px + 4 && mouseX < px + side && mouseY >= py + 46 && mouseY < py + ph - 43) {
+            int navRows = Math.min(NAV.length, Math.max(3, (ph - 120) / 22));
+            int maxPage = (NAV.length - 1) / navRows;
+            navPage = Math.max(0, Math.min(maxPage, navPage - (int) Math.signum(vertical)));
+            build();
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
     }
 
     @Override
