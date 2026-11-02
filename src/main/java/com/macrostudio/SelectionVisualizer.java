@@ -60,8 +60,10 @@ public final class SelectionVisualizer {
         int fillRed = (alpha << 24) | 0xF36879;
         int fillGreen = ((alpha * 3 / 4) << 24) | 0x36E4AD;
         if (s.selectionVisuals) {
-            Gizmos.cuboid(new AABB(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1),
-                GizmoStyle.strokeAndFill(RED, 2.2f, fillRed));
+            AABB bounds = new AABB(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1);
+            Gizmos.cuboid(bounds, s.showDemolitionCells
+                    ? GizmoStyle.strokeAndFill(RED, 2.2f, fillRed)
+                    : GizmoStyle.stroke(GOLD, 2.2f));
         }
         if (s.showActiveLayer) {
             int y = Digger.active && Digger.currentTarget() != null
