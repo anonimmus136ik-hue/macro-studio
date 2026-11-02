@@ -329,6 +329,7 @@ public final class Digger {
             target = null;
             targetTicks = 0;
             index++;
+            if (index >= path.size()) { finish(); return; }
         }
         if (target == null) target = findTarget(mc);
         if (target != null) {
