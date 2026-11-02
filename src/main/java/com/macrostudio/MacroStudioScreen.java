@@ -175,7 +175,7 @@ public final class MacroStudioScreen extends Screen {
             case MINING -> 370;
             case AUTO -> 355;
             case SETTINGS -> 365;
-            case VISUAL -> (visualPage == 2 ? 530 : 365);
+            case VISUAL -> (visualPage == 2 ? 570 : 400);
             case DEPOSIT -> 400;
             default -> 320;
         };
@@ -483,36 +483,42 @@ public final class MacroStudioScreen extends Screen {
 
     private void visuals() {
         Settings s = Settings.I;
-        int x = cx + 12, y = cy + 36;
-        int w = Math.min(cw - 24, 345);
-        button("WORLD", x, y, Math.max(60, (w - 8) / 2), 25,
-                visualPage == 0 ? Tone.SELECTED : Tone.MUTED, b -> { visualPage = 0; build(); });
-        button("HUD / PREVIEW", x + (w - 8) / 2 + 8, y, Math.max(60, (w - 8) / 2), 25,
-                visualPage == 1 ? Tone.SELECTED : Tone.MUTED, b -> { visualPage = 1; build(); });
-        int yy = y + 39;
+        int x = cx + 12, y = cy + 40;
+        int w = Math.max(55, Math.min(cw - 24, 410));
+        int col = Math.max(20, (w - 12) / 4);
+        String[] tabs = {"WORLD", "HUD", "3D / PLAN", "WINDOW"};
+        for (int i = 0; i < 4; i++) {
+            final int page = i;
+            button(tabs[i], x + i * (col + 4), y, col, 27,
+                    visualPage == i ? Tone.SELECTED : Tone.MUTED,
+                    press -> { visualPage = page; scrollOffset = 0; build(); });
+        }
+        int yy = y + 46;
         if (visualPage == 0) {
-            button(toggle("FULLBRIGHT", s.brightMax), x, yy, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.brightMax = !s.brightMax));
-            button(toggle("HIDE RAIN (LOCAL)", s.noRain), x, yy + 33, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.noRain = !s.noRain));
-            button("TIME: " + Extras.TIME_NAMES[s.timeMode], x, yy + 66, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.timeMode = (s.timeMode + 1) % Extras.TIME_NAMES.length));
-            button(toggle("AUTO SPRINT", s.autoSprint), x, yy + 99, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.autoSprint = !s.autoSprint));
-            button(toggle("CRITICAL SOUND", s.critSound), x, yy + 132, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.critSound = !s.critSound));
-            button(keyLabel("zoom", "ZOOM KEY: ", s.zoomKey), x, yy + 165, w, 26, Tone.MUTED,
-                    b -> capture("zoom", code -> s.zoomKey = code));
-        } else {
-            button(toggle("SHULKER PREVIEW", s.shulkerPreview), x, yy, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.shulkerPreview = !s.shulkerPreview));
-            button(toggle("COORDINATES HUD", s.hudCoords), x, yy + 33, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.hudCoords = !s.hudCoords));
-            button(toggle("ARMOR DURABILITY", s.hudArmor), x, yy + 66, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.hudArmor = !s.hudArmor));
-            button(toggle("WAYPOINT HUD", s.hudWaypoints), x, yy + 99, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.hudWaypoints = !s.hudWaypoints));
-            button("ADD WAYPOINT HERE", x, yy + 132, w, 26, Tone.NORMAL, b -> callAndRefresh(() -> {
+            button(toggle("FULLBRIGHT", s.brightMax), x, yy, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.brightMax = !s.brightMax));
+            button(toggle("HIDE RAIN (LOCAL)", s.noRain), x, yy + 37, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.noRain = !s.noRain));
+            button("TIME: " + Extras.TIME_NAMES[s.timeMode], x, yy + 74, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.timeMode = (s.timeMode + 1) % Extras.TIME_NAMES.length));
+            button(toggle("AUTO SPRINT", s.autoSprint), x, yy + 111, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.autoSprint = !s.autoSprint));
+            button(toggle("CRITICAL SOUND", s.critSound), x, yy + 148, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.critSound = !s.critSound));
+            button(keyLabel("zoom", "ZOOM KEY: ", s.zoomKey), x, yy + 185, w, 29, Tone.MUTED,
+                    press -> capture("zoom", code -> s.zoomKey = code));
+        } else if (visualPage == 1) {
+            button(toggle("SHULKER PREVIEW", s.shulkerPreview), x, yy, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.shulkerPreview = !s.shulkerPreview));
+            button(toggle("COORDINATES", s.hudCoords), x, yy + 37, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.hudCoords = !s.hudCoords));
+            button(toggle("ARMOR DURABILITY", s.hudArmor), x, yy + 74, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.hudArmor = !s.hudArmor));
+            button(toggle("WAYPOINTS", s.hudWaypoints), x, yy + 111, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.hudWaypoints = !s.hudWaypoints));
+            button(toggle("RESOURCE COUNTER", s.resourceHud), x, yy + 148, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.resourceHud = !s.resourceHud));
+            button("ADD WAYPOINT HERE", x, yy + 196, w, 29, Tone.PRIMARY, press -> callAndRefresh(() -> {
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.player != null) {
                     Settings.Waypoint point = new Settings.Waypoint();
@@ -523,8 +529,48 @@ public final class MacroStudioScreen extends Screen {
                     s.waypoints.add(point);
                 }
             }));
-            button("CLEAR WAYPOINTS (" + s.waypoints.size() + ")", x, yy + 165, w, 26, Tone.DANGER,
-                    b -> callAndRefresh(s.waypoints::clear));
+            button("CLEAR WAYPOINTS (" + s.waypoints.size() + ")", x, yy + 233, w, 29, Tone.DANGER,
+                    press -> callAndRefresh(s.waypoints::clear));
+        } else if (visualPage == 2) {
+            button(toggle("MASTER 3D OVERLAY [0]", s.overlayEnabled), x, yy, w, 29, Tone.PRIMARY,
+                    press -> callAndRefresh(() -> s.overlayEnabled = !s.overlayEnabled));
+            button(toggle("GREEN SAFE WALKING", s.showWalkableCells), x, yy + 37, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.showWalkableCells = !s.showWalkableCells));
+            button(toggle("RED MINING VOLUME", s.showDemolitionCells), x, yy + 74, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.showDemolitionCells = !s.showDemolitionCells));
+            button(toggle("SELECTION WIREFRAME", s.selectionVisuals), x, yy + 111, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.selectionVisuals = !s.selectionVisuals));
+            button(toggle("ACTIVE LAYER", s.showActiveLayer), x, yy + 148, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.showActiveLayer = !s.showActiveLayer));
+            button(toggle("GREEN A* ROUTE", s.showRoute), x, yy + 185, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.showRoute = !s.showRoute));
+            button(toggle("DRILL 3x3x2", s.drillPreview), x, yy + 222, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.drillPreview = !s.drillPreview));
+            button(toggle("BUILD PREVIEW", s.buildPreview), x, yy + 259, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.buildPreview = !s.buildPreview));
+            int half = Math.max(25, (w - 6)/2);
+            button("OPACITY -", x, yy + 319, half, 28, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.overlayOpacity = Math.max(10, s.overlayOpacity - 5)));
+            button("OPACITY +", x + half + 6, yy + 319, half, 28, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.overlayOpacity = Math.min(75, s.overlayOpacity + 5)));
+            button("RANGE -", x, yy + 383, half, 28, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.overlayRenderRange = Math.max(8, s.overlayRenderRange - 4)));
+            button("RANGE +", x + half + 6, yy + 383, half, 28, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.overlayRenderRange = Math.min(48, s.overlayRenderRange + 4)));
+        } else {
+            int half = Math.max(25, (w - 6)/2);
+            button("WIDTH -", x, yy, half, 29, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.uiWidthPercent = Math.max(55, s.uiWidthPercent - 5)));
+            button("WIDTH +", x + half + 6, yy, half, 29, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.uiWidthPercent = Math.min(96, s.uiWidthPercent + 5)));
+            button("HEIGHT -", x, yy + 70, half, 29, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.uiHeightPercent = Math.max(65, s.uiHeightPercent - 5)));
+            button("HEIGHT +", x + half + 6, yy + 70, half, 29, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.uiHeightPercent = Math.min(97, s.uiHeightPercent + 5)));
+            button(keyLabel("overlay", "OVERLAY KEY: ", s.overlayKey), x, yy + 139, w, 29, Tone.NORMAL,
+                    press -> capture("overlay", code -> s.overlayKey = code < 0 ? 48 : code));
+            button("SAVE ALL SETTINGS", x, yy + 184, w, 29, Tone.PRIMARY,
+                    press -> { Settings.save(); Recorder.msg("Visual settings saved"); });
         }
     }
 
@@ -741,8 +787,16 @@ public final class MacroStudioScreen extends Screen {
                 line(g, "K = keep    + = deposit", x, y + 243, GREY);
             }
             case VISUAL -> {
-                line(g, "VISUAL & HUD / REAL TOGGLES", x, y, TEAL);
-                line(g, "Client-side options only", x, y + 265, GREY);
+                line(g, "VISUAL ATELIER  /  CUSTOMIZATION", x, y, GOLD);
+                if (visualPage == 2) {
+                    line(g, "Red = blocks to clear  |  Green = safe floor", x, y + 298, WHITE);
+                    line(g, "Opacity: " + Settings.I.overlayOpacity + "%", x, y + 351, TEAL);
+                    line(g, "Render range: " + Settings.I.overlayRenderRange + " blocks", x, y + 414, TEAL);
+                } else if (visualPage == 3) {
+                    line(g, "Width: " + Settings.I.uiWidthPercent + "%", x, y + 89, TEAL);
+                    line(g, "Height: " + Settings.I.uiHeightPercent + "%", x, y + 159, TEAL);
+                    line(g, "Scroll with the mouse wheel to see all controls.", x, y + 255, GREY);
+                }
             }
             case PERF -> {
                 line(g, "PERFORMANCE / LIGHTWEIGHT RENDER", x, y, TEAL);
