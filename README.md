@@ -18,7 +18,7 @@ The Gradle wrapper uses Java 25 for Fabric Loom; the mod's class bytecode is Jav
 - Resizable territory using two points (POS1 and POS2); adjust X/Z in **Smart Route** and depth in **Mining Studio**.
 - Native Minecraft 1.21.11 Gizmos: transparent 3D selection volume, highlighted current layer, point A/B boxes, current mining target.
 - **Mine Up / Down** selection direction, with fixed Y layers in the digger queue.
-- **Drill 3×3×2 preview** renders the 18 estimated block cells in the direction of the clicked face. This is visual only, **not an integration with any private server-side drill**.
+- **Drill 3×3×2 preview** renders the 18 estimated block cells in the direction of the clicked face. This is visual only, **not an integration with any private server-side drill**.\n- **Drill Tool Assist**: save the currently held custom tool ID and choose one matching block type by looking at a block before opening the GUI. If the block matches, the miner selects that drill; on other types it chooses an ordinary correct harvesting tool from the hotbar when available. The server still decides actual mined cells.
 - Mining no longer searches up to ten previously visited columns for old targets.
 - Bounded horizontal A* navigation avoids known floor holes on loaded terrain; on blocked paths, the miner stops with an explicit reason rather than stepping into the void. The world is not scanned through walls for ores.
 - Client movement still uses normal keys, camera turning and reach rules; no packet spoofing or anti-cheat bypass.
