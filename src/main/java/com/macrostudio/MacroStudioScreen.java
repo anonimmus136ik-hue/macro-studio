@@ -250,12 +250,12 @@ public final class MacroStudioScreen extends Screen {
     private void marketPanel() {
         Settings s = Settings.I;
         int x = cx + 12, y = cy + 38, w = Math.max(90, Math.min(380, cw - 24));
-        String[] ores = {"DIAMOND", "EMERALD", "GOLD", "IRON", "REDSTONE", "COAL", "STONE"};
+        String[] ores = ResourceCatalog.NAMES;
         int cellW = Math.max(62, (w - 8) / 2);
         for (int i = 0; i < ores.length; i++) {
             final int idx = i;
             int row = i / 2, col = i % 2;
-            button((s.resourceFilter[i] ? "[x] " : "[ ] ") + ores[i], x + col * (cellW + 8), y + row * 31,
+            button((s.resourceFilter[i] ? "[x] " : "[ ] ") + ores[i] + " " + ResourceCatalog.count(Minecraft.getInstance(),i), x + col * (cellW + 8), y + row * 31,
                     cellW, 25, s.resourceFilter[i] ? Tone.SELECTED : Tone.MUTED,
                     b -> callAndRefresh(() -> s.resourceFilter[idx] = !s.resourceFilter[idx]));
         }
@@ -263,6 +263,8 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(() -> s.marketPrice = Math.max(1, s.marketPrice - 50)));
         button("PRICE + 50", x + cellW + 8, y + 155, cellW, 26, Tone.MUTED,
                 b -> callAndRefresh(() -> s.marketPrice = Math.min(100000000, s.marketPrice + 50)));
+        button(toggle("INVENTORY ORE HUD", s.resourceHud), x, y + 225, w, 25, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.resourceHud = !s.resourceHud));
         button("COPY /market sell " + s.marketPrice, x, y + 195, w, 30, Tone.PRIMARY, b -> {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player == null || mc.player.getMainHandItem().getCount() < 64) {
