@@ -759,34 +759,78 @@ public final class MacroStudioScreen extends Screen {
         }
     }
 
+    private void paintButton(GuiGraphics g, UiButton ui) {
+        Button b = ui.button();
+        if (!b.visible) return;
+        int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
+        boolean hovered = b.isHoveredOrFocused();
+        String caption = ui.caption();
+        boolean on = caption.endsWith("[ON]");
+        boolean off = caption.endsWith("[OFF]");
+        boolean checkbox = on || off;
+        if (checkbox) {
+            // Table-like checkbox row, readable at narrow GUI scales.
+            rounded(g, x, y, w, h, hovered ? 0xFF4D6A70 : BORDER);
+            rounded(g, x + 1, y + 1, w - 2, h - 2, hovered ? 0xFF203C40 : CARD);
+            int size = Math.max(10, Math.min(16, h - 8));
+            rounded(g, x + 8, y + (h - size)/2, size, size,
+                    on ? TEAL : 0xFF425464);
+            rounded(g, x + 10, y + (h - size)/2 + 2, size - 4, size - 4,
+                    on ? 0xFF194A3D : PANEL);
+            if (on) g.drawCenteredString(font, "✓", x + 8 + size/2, y + (h - 8)/2, 0xFFFFFFFF);
+            String label = caption.substring(0, caption.lastIndexOf("   ["));
+            int maxChars = Math.max(3, (w - size - 30)/6);
+            g.drawString(font, cut(label,maxChars),x + size + 16,y + (h - 8)/2,WHITE);
+        } else {
+            int bg = switch (ui.tone()) {
+                case PRIMARY -> hovered ? 0xFF4EDFB1 : 0xFF167F65;
+                case DANGER -> hovered ? 0xFF9B4255 : 0xFF642D3E;
+                case SELECTED -> hovered ? 0xFF3D6562 : 0xFF254640;
+                case MUTED -> hovered ? 0xFF384959 : 0xFF263240;
+                case NORMAL -> hovered ? 0xFF314F55 : 0xFF1E323C;
+            };
+            rounded(g, x, y, w, h, hovered ? GOLD : BORDER);
+            rounded(g, x + 1, y + 1, w - 2, h - 2, bg);
+            if (ui.tone() == Tone.SELECTED)
+                g.fill(x + 2, y + 3, x + 4, y + h - 3, TEAL);
+            g.drawCenteredString(font,
+                    cut(caption,Math.max(4,(w - 13)/6)),
+                    x + w/2, y + (h - 8)/2, WHITE);
+        }
+    }
+
+    private void paintScrollbar(GuiGraphics g) {
+        if (maxScroll <= 0 || ch < 24) return;
+        int x = cx + cw - 7, y = cy + 7, h = ch - 14;
+        g.fill(x, y, x + 3, y + h, 0xFF1A2B33);
+        int thumb = Math.max(14, (int)((long) h * h / (h + maxScroll)));
+        int position = (h - thumb) * scrollOffset / Math.max(1,maxScroll);
+        rounded(g, x - 1, y + position, 5, thumb, TEAL);
+    }
+
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
+        // Permanent chrome never scrolls.
         rounded(g, px + 11, py + 12, 23, 24, 0xFF29392F);
         line(g, "M", px + 19, py + 20, GOLD);
         line(g, "MACRO STUDIO  //  OBSIDIAN", px + side + 15, py + 16, WHITE);
-        line(g, "ATELIER UI  /  1.21.11", px + side + 15, py + 29, GOLD);
+        line(g, "PREMIUM UI  /  1.21.11", px + side + 15, py + 29, GOLD);
         line(g, Recorder.active ? "REC" : Digger.active ? (Digger.isPaused() ? "PAUSED" : "MINING") : "READY",
                 px + pw - 110, py + 19, Recorder.active ? RED : Digger.active ? TEAL : GREY);
-        line(g, "v2.3.0 PREVIEW", px + 15, py + ph - 20, GOLD);
+        line(g, "v2.4.0  ·  0 = 3D", px + 11, py + ph - 19, GOLD);
+
+        // The world preview, header and selected page are clipped to the content viewport.
+        g.enableScissor(cx + 2, cy + 2, cx + cw - 3, cy + ch - 3);
+        g.pose().pushMatrix();
+        g.pose().translate(0f, -scrollOffset);
         drawPage(g);
-        // Custom skinned clickable widgets (native buttons are visually transparent).
-        for (UiButton ui : paintedButtons) {
-            Button b = ui.button();
-            int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
-            boolean hot = b.isHoveredOrFocused();
-            int bg = switch (ui.tone()) {
-                case PRIMARY -> hot ? 0xFF89F3D0 : 0xFF168F70;
-                case DANGER -> hot ? 0xFFFF8498 : 0xFF8B354D;
-                case SELECTED -> hot ? 0xFF41677B : 0xFF2A5066;
-                case MUTED -> hot ? 0xFF34445E : 0xFF202C40;
-                case NORMAL -> hot ? 0xFF2D6A65 : 0xFF243C47;
-            };
-            rounded(g, x, y, w, h, hot ? 0xFF9AD5DE : BORDER);
-            rounded(g, x + 1, y + 1, w - 2, h - 2, bg);
-            if (ui.tone() == Tone.SELECTED) g.fill(x + 1, y + 3, x + 3, y + h - 3, TEAL);
-            int fg = (ui.tone() == Tone.PRIMARY && hot) ? 0xFF10262D : WHITE;
-            g.drawCenteredString(font, cut(ui.caption(), Math.max(4, (w - 10) / 6)), x + w / 2, y + (h - 8) / 2, fg);
-        }
+        g.pose().popMatrix();
+        for (UiButton ui : paintedButtons) if (ui.content()) paintButton(g,ui);
+        g.disableScissor();
+
+        // Sidebar is fixed and independently paginated / wheel-scrollable.
+        for (UiButton ui : paintedButtons) if (!ui.content()) paintButton(g,ui);
+        paintScrollbar(g);
     }
 }
