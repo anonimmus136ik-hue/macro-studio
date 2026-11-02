@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "macrostudio",
   "version": "${version}",
-  "name": "Macro Studio MAX 2.2",
+  "name": "Macro Studio MAX 2.3 — Obsidian Edition",
   "description": "Client macros, precise mining controls, inventory convenience and custom UI.",
   "authors": [
     "Claude"
