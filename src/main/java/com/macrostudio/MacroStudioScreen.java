@@ -638,32 +638,105 @@ public final class MacroStudioScreen extends Screen {
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (mouseX >= cx && mouseX < cx + cw && mouseY >= scrollTop && mouseY <= scrollBottom
+                && scrollMax > 0 && Math.abs(verticalAmount) > 0.0001) {
+            int delta = (int) Math.round(verticalAmount * 28.0);
+            if (delta == 0) delta = verticalAmount > 0 ? 18 : -18;
+            int next = Math.max(0, Math.min(scrollMax, scrollPx - delta));
+            if (scrollPx != next) {
+                scrollPx = next;
+                build();
+            }
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    private void paintButton(GuiGraphics g, UiButton ui) {
+        Button b = ui.button();
+        int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
+        boolean hot = b.isHoveredOrFocused();
+        boolean check = ui.caption().startsWith("[x] ") || ui.caption().startsWith("[ ] ");
+        boolean checked = ui.caption().startsWith("[x] ");
+        int bg = switch (ui.tone()) {
+            case PRIMARY -> hot ? 0xFF68EAC7 : 0xFF207F7B;
+            case DANGER -> hot ? 0xFFDE748A : 0xFF7C3248;
+            case SELECTED -> hot ? 0xFF405A7B : 0xFF2B4566;
+            case MUTED -> hot ? 0xFF32435A : 0xFF1B2A3C;
+            case NORMAL -> hot ? 0xFF304F66 : 0xFF1F3248;
+        };
+        rounded(g, x, y, w, h, hot ? 0xFF77CED1 : 0xFF263B50);
+        rounded(g, x + 1, y + 1, w - 2, h - 2, bg);
+        if (ui.tone() == Tone.SELECTED) g.fill(x + 1, y + 3, x + 4, y + h - 3, TEAL);
+        int fg = ui.tone() == Tone.PRIMARY && hot ? 0xFF07151B : WHITE;
+        if (check) {
+            int bx = x + 9, by = y + Math.max(2, (h - 15) / 2);
+            g.fill(bx, by, bx + 15, by + 15, checked ? 0xFF3BD7AA : 0xFF547085);
+            g.fill(bx + 2, by + 2, bx + 13, by + 13, checked ? 0xFF3BD7AA : 0xFF132334);
+            if (checked) {
+                // Pixel-painted checkmark: independent of language/font glyph support.
+                g.fill(bx + 3, by + 7, bx + 6, by + 10, 0xFF102C26);
+                g.fill(bx + 6, by + 9, bx + 9, by + 12, 0xFF102C26);
+                g.fill(bx + 9, by + 6, bx + 12, by + 9, 0xFF102C26);
+                g.fill(bx + 10, by + 4, bx + 13, by + 7, 0xFF102C26);
+            }
+            String label = ui.caption().substring(4);
+            g.drawString(font, cut(label, Math.max(4, (w - 39) / 6)),
+                    x + 31, y + (h - 8) / 2, WHITE);
+        } else {
+            g.drawCenteredString(font, cut(ui.caption(), Math.max(4, (w - 10) / 6)),
+                    x + w / 2, y + (h - 8) / 2, fg);
+        }
+    }
+
+    @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
+        // Fixed chrome and tab headers do not scroll.
         line(g, "M", px + 16, py + 18, TEAL);
         line(g, "MACRO STUDIO", px + side + 15, py + 16, WHITE);
-        line(g, "MAX 2.3  /  1.21.11", px + side + 15, py + 29, GREY);
+        line(g, "MAX 2.3  /  MC 1.21.11", px + side + 15, py + 29, GREY);
         line(g, Recorder.active ? "REC" : Digger.active ? (Digger.isPaused() ? "PAUSED" : "MINING") : "READY",
-                px + pw - 110, py + 19, Recorder.active ? RED : Digger.active ? TEAL : GREY);
-        line(g, "v2.3.0  |  3D", px + 15, py + ph - 20, GREY);
-        drawPage(g);
-        // Custom skinned clickable widgets (native buttons are visually transparent).
+                px + pw - 108, py + 19, Recorder.active ? RED : Digger.active ? TEAL : GREY);
+        line(g, "v2.3.0", px + 15, py + ph - 20, GREY);
+        line(g, NAV[tab.ordinal()] + "  /  SETTINGS", cx + 10, cy + 8, TEAL);
+        if (tab == Tab.MINING) {
+            line(g, cut(Digger.status(), Math.max(12, cw / 7)), cx + 12, cy + 64,
+                    Digger.active ? TEAL : GREY);
+            g.fill(cx + 12, cy + 80, cx + 22, cy + 88, RED);
+            line(g, "MINE", cx + 27, cy + 79, WHITE);
+            g.fill(cx + 89, cy + 80, cx + 99, cy + 88, 0xFF2CCB84);
+            line(g, "WALK", cx + 104, cy + 79, WHITE);
+            line(g, "0 = 3D SELECT", cx + Math.min(185, cw - 94), cy + 79, GOLD);
+        }
+
+        // Draw all page graphics within the panel. Scissor clips both text and cards,
+        // transform scrolls them at the same rate as the actual clickable widgets.
+        if (scrollTop < scrollBottom) {
+            g.enableScissor(cx + 4, scrollTop, cx + cw - 8, scrollBottom);
+            g.pose().pushMatrix();
+            g.pose().translate(0.0f, (float) -scrollPx);
+            drawPage(g);
+            g.pose().popMatrix();
+            g.disableScissor();
+        }
         for (UiButton ui : paintedButtons) {
-            Button b = ui.button();
-            int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
-            boolean hot = b.isHoveredOrFocused();
-            int bg = switch (ui.tone()) {
-                case PRIMARY -> hot ? 0xFF78FFDA : 0xFF35B7A6;
-                case DANGER -> hot ? 0xFFFF8498 : 0xFF8B354D;
-                case SELECTED -> hot ? 0xFF41677B : 0xFF2A5066;
-                case MUTED -> hot ? 0xFF34445E : 0xFF202C40;
-                case NORMAL -> hot ? 0xFF38526A : 0xFF29384D;
-            };
-            rounded(g, x, y, w, h, hot ? 0xFF9AD5DE : BORDER);
-            rounded(g, x + 1, y + 1, w - 2, h - 2, bg);
-            if (ui.tone() == Tone.SELECTED) g.fill(x + 1, y + 3, x + 3, y + h - 3, TEAL);
-            int fg = (ui.tone() == Tone.PRIMARY && hot) ? 0xFF10262D : WHITE;
-            g.drawCenteredString(font, cut(ui.caption(), Math.max(4, (w - 10) / 6)), x + w / 2, y + (h - 8) / 2, fg);
+            if (ui.content()) {
+                g.enableScissor(cx + 4, scrollTop, cx + cw - 8, scrollBottom);
+                paintButton(g, ui);
+                g.disableScissor();
+            } else paintButton(g, ui);
+        }
+
+        // Always-visible scroll track; thumb indicates how much content remains.
+        if (scrollMax > 0 && scrollBottom > scrollTop) {
+            int trackX = cx + cw - 8;
+            int trackH = scrollBottom - scrollTop;
+            int thumbH = Math.max(18, trackH * trackH / (trackH + scrollMax));
+            int thumbY = scrollTop + (trackH - thumbH) * scrollPx / scrollMax;
+            g.fill(trackX, scrollTop, trackX + 3, scrollBottom, 0xFF1F2D40);
+            g.fill(trackX, thumbY, trackX + 3, thumbY + thumbH, 0xFF5EDCC1);
         }
     }
 }
