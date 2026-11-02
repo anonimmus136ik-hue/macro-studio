@@ -1,4 +1,4 @@
-name: Build Macro Studio MAX 2.3.0
+name: Build Macro Studio MAX 2.4.0
 
 on:
   push:
@@ -26,10 +26,10 @@ jobs:
           set -euo pipefail
           test -f src/main/java/com/macrostudio/Digger.java
           test -f src/main/java/com/macrostudio/MacroStudioScreen.java
-          grep -q '^mod_version=2.3.0$' gradle.properties
+          grep -q '^mod_version=2.4.0$' gradle.properties
           test ! -f project.zip
           test ! -f MacroStudio-GitHub-Ready.zip
-          echo "Compiling source version 2.3.0"
+          echo "Compiling source version 2.4.0"
 
       - name: Build JAR
         shell: bash
@@ -42,23 +42,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          JAR=build/libs/macro-studio-2.3.0.jar
+          JAR=build/libs/macro-studio-2.4.0.jar
           test -f "$JAR"
-          unzip -p "$JAR" fabric.mod.json | grep -q '"version": "2.3.0"'
+          unzip -p "$JAR" fabric.mod.json | grep -q '"version": "2.4.0"'
           unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/Digger.class'
           unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/MacroStudioScreen.class'
           unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/SmartPath.class'
           unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/SelectionVisualizer.class'
           unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/ResourceCatalog.class'
           unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/DrillAssist.class'
+          unzip -Z -1 "$JAR" | grep -q 'assets/macrostudio/icon.png'
+          unzip -p "$JAR" fabric.mod.json | grep -q '"icon": "assets/macrostudio/icon.png"'
           sha256sum "$JAR"
 
       - name: Upload single current JAR
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: MacroStudio-MAX-2.3.0
-          path: build/libs/macro-studio-2.3.0.jar
+          name: MacroStudio-MAX-2.4.0
+          path: build/libs/macro-studio-2.4.0.jar
           if-no-files-found: error
           retention-days: 30
 
