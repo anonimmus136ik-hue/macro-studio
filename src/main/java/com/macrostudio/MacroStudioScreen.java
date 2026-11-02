@@ -528,22 +528,27 @@ public final class MacroStudioScreen extends Screen {
     }
 
     private void renderSelectionGrid(GuiGraphics g, int x, int y, int w, int h) {
-        rounded(g, x, y, w, h, 0xFF101724);
+        if (w < 30 || h < 30) return;
+        rounded(g, x, y, w, h, 0xFF0B1220);
         int[] a = Settings.I.dig1, b = Settings.I.dig2;
         if (a == null || b == null || a.length < 3 || b.length < 3) {
-            g.drawCenteredString(font, "SELECT POS1 + POS2", x + w / 2, y + h / 2 - 4, GREY);
+            g.drawCenteredString(font, "PRESS 0 + 3 RIGHT CLICKS", x + w / 2, y + h / 2 - 4, GREY);
             return;
         }
-        int cols = (int) Math.min(19, Math.abs((long) a[0] - b[0]) + 1);
-        int rows = (int) Math.min(10, Math.abs((long) a[2] - b[2]) + 1);
-        int cell = Math.max(2, Math.min((w - 10) / cols, (h - 10) / rows));
-        int ox = x + (w - cols * cell) / 2;
-        int oy = y + (h - rows * cell) / 2;
-        for (int row = 0; row < rows; row++) for (int col = 0; col < cols; col++) {
-            int sx = ox + col * cell, sy = oy + row * cell;
-            g.fill(sx, sy, sx + cell - 1, sy + cell - 1, (row % 2 == 0 ? 0xFF3D978F : 0xFF356C81));
+        int cols = (int) Math.min(22, Math.abs((long) a[0] - b[0]) + 1);
+        int rows = (int) Math.min(13, Math.abs((long) a[2] - b[2]) + 1);
+        int cell = Math.max(2, Math.min((w - 16) / (cols + 2), (h - 16) / (rows + 2)));
+        int ox = x + (w - (cols + 2) * cell) / 2;
+        int oy = y + (h - (rows + 2) * cell) / 2;
+        for (int row = -1; row <= rows; row++) for (int col = -1; col <= cols; col++) {
+            boolean exterior = row == -1 || col == -1 || row == rows || col == cols;
+            if (exterior && !Settings.I.digSafeWalkPreview) continue;
+            int sx = ox + (col + 1) * cell, sy = oy + (row + 1) * cell;
+            int color = exterior ? 0xFF238B63 : (row + col) % 2 == 0 ? 0xFFB5455C : 0xFF942D43;
+            g.fill(sx, sy, sx + cell - 1, sy + cell - 1, color);
         }
-        g.fill(ox, oy, ox + Math.max(2, cell - 1), oy + Math.max(2, cell - 1), GOLD);
+        g.fill(ox + cell, oy + cell, ox + cell + Math.max(2, cell - 1),
+                oy + cell + Math.max(2, cell - 1), GOLD);
     }
 
     private void drawPage(GuiGraphics g) {
@@ -557,31 +562,43 @@ public final class MacroStudioScreen extends Screen {
                 line(g, "REPLAY: " + (Replayer.active ? "ACTIVE" : "IDLE"), x, y + 245, GREY);
             }
             case MINING -> {
-                line(g, "MINING STUDIO  /  ACTIVE CONTROLS", x, y, TEAL);
-                int ly = cy + 30;
-                int leftW = miningLeftWidth();
-                line(g, "POINT 1 / " + cut(point(Settings.I.dig1), Math.max(12, leftW / 6)), x, ly + 61, WHITE);
-                line(g, "POINT 2 / " + cut(point(Settings.I.dig2), Math.max(12, leftW / 6)), x, ly + 116, WHITE);
-                line(g, "DEPTH: " + Settings.I.digDepth + " LAYERS", x, ly + 168, GOLD);
-                line(g, "TURN: " + Settings.I.digTurnSpeed + " DEG/TICK", x, ly + 238, TEAL);
+                int base = cy + 104;
+                int leftW = splitMining() ? (cw - 36) / 2 : cw - 24;
+                line(g, "SELECT THE DIGGING VOLUME", x, base - 12, TEAL);
+                line(g, "POS1: " + cut(point(Settings.I.dig1), Math.max(13, leftW / 6)), x, base + 32, GREY);
+                line(g, "POS2: " + cut(point(Settings.I.dig2), Math.max(13, leftW / 6)), x, base + 66, GREY);
+                int[] hp = Settings.I.digHeightPoint;
+                line(g, "HEIGHT Y: " + (hp == null ? "SET WITH THIRD RIGHT CLICK" : hp[1]),
+                        x, base + 107, GOLD);
+                line(g, "TURN RATE: " + Settings.I.digTurnSpeed + " deg/tick", x, base + 364, TEAL);
+                line(g, "LEGACY DEPTH: " + Settings.I.digDepth, x, base + 399, GOLD);
                 if (splitMining()) {
-                    int rightX = x + leftW + 12;
-                    int rightW = cw - 26 - leftW - 12;
-                    line(g, "AREA / TOP VIEW", rightX + 5, ly + 46, PURPLE);
-                    renderSelectionGrid(g, rightX, ly + 60, rightW, 115);
-                    line(g, "COLUMNS " + Digger.selectedCells(), rightX + 5, ly + 185, GREY);
-                    line(g, "STATUS: " + cut(Digger.status(), Math.max(12, rightW / 6)), rightX + 5, ly + 199,
+                    int rightX = x + leftW + 14, rightW = cw - 30 - leftW - 14;
+                    drawCard(g, rightX, base, rightW, 287);
+                    line(g, "3D MINING MAP", rightX + 10, base + 12, WHITE);
+                    renderSelectionGrid(g, rightX + 7, base + 35, rightW - 14, 139);
+                    line(g, "RED  = MINE BLOCKS", rightX + 9, base + 183, RED);
+                    line(g, "GREEN = FLOOR PREVIEW", rightX + 9, base + 198, TEAL);
+                    line(g, "COLUMNS: " + Digger.selectedCells(), rightX + 9, base + 219, GREY);
+                    line(g, "VOLUME: " + Digger.selectedVolume(), rightX + 9, base + 234, GREY);
+                    line(g, "BLOCKS SKIPPED: " + Digger.skippedBlocks(), rightX + 9, base + 249, GREY);
+                    int barY = base + 273;
+                    rounded(g, rightX + 8, barY, rightW - 16, 6, 0xFF39455C);
+                    rounded(g, rightX + 8, barY, (rightW - 16) * Digger.progressPercent() / 100, 6, TEAL);
+                    drawCard(g, rightX, base + 300, rightW, 88);
+                    line(g, "MINER STATUS", rightX + 9, base + 313, PURPLE);
+                    line(g, cut(Digger.status(), Math.max(11, rightW / 6)), rightX + 9, base + 335,
                             Digger.active ? TEAL : GREY);
-                    int barY = ly + 223;
-                    rounded(g, rightX + 4, barY, rightW - 8, 8, 0xFF34445A);
-                    rounded(g, rightX + 4, barY,
-                            (rightW - 8) * Digger.progressPercent() / 100, 8, TEAL);
-                    line(g, Digger.progressPercent() + "%  /  " + Digger.completedCells() + "/" + Digger.totalCells(), rightX + 5, barY + 14, GREY);
-                } else if (ch >= 340) {
-                    line(g, "STATUS: " + cut(Digger.status(), Math.max(15, cw / 6)), x, ly + 279, GREY);
-                }
-                if (!Digger.lastError().isEmpty() && ch >= 390) {
-                    line(g, cut(Digger.lastError(), Math.max(30, cw / 6)), x, cy + ch - 18, RED);
+                    line(g, Digger.progressPercent() + "%   " + Digger.completedCells() + "/" + Digger.totalCells(),
+                            rightX + 9, base + 353, WHITE);
+                    if (!Digger.lastError().isEmpty())
+                        line(g, cut(Digger.lastError(), Math.max(11, rightW / 6)), rightX + 9, base + 370, RED);
+                } else {
+                    int infoY = base + 495;
+                    line(g, "RED = MINE / GREEN = WALK PREVIEW", x, infoY, TEAL);
+                    renderSelectionGrid(g, x, infoY + 18, cw - 28, 110);
+                    line(g, "VOLUME: " + Digger.selectedVolume() + " BLOCKS", x, infoY + 141, GOLD);
+                    line(g, cut(Digger.status(), Math.max(20, cw / 6)), x, infoY + 158, GREY);
                 }
             }
             case AUTO -> {
