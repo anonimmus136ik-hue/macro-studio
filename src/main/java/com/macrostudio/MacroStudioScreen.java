@@ -195,44 +195,66 @@ public final class MacroStudioScreen extends Screen {
 
     private void mining() {
         Minecraft mc = Minecraft.getInstance();
-        int x = cx + 12, y = cy + 30;
+        Settings s = Settings.I;
+        int x = cx + 12, y = cy + 27;
         int gap = 7;
-        int buttonsW = cw - 24;
-        int third = (buttonsW - gap * 2) / 3;
-        // Always visible at the top, even at a small GUI scale.
-        button("START", x, y, third, 29, Tone.PRIMARY, b -> {
+        int full = Math.max(126, cw - 24);
+        int third = (full - gap * 2) / 3;
+        // These emergency controls NEVER scroll away.
+        button("START", x, y, third, 30, Tone.PRIMARY, b -> {
             if (Digger.active && Digger.userPaused()) Digger.togglePause();
             else if (!Digger.active) Digger.start(mc);
             if (Digger.active && !Digger.isPaused()) onClose();
             else build();
         });
         button(Digger.userPaused() ? "RESUME" : "PAUSE", x + third + gap, y,
-                third, 29, Tone.NORMAL, b -> { Digger.togglePause(); build(); });
-        button("STOP", x + (third + gap) * 2, y, third, 29, Tone.DANGER, b -> { Digger.stop(); build(); });
+                third, 30, Tone.NORMAL, b -> { Digger.togglePause(); build(); });
+        button("STOP", x + (third + gap) * 2, y, third, 30, Tone.DANGER,
+                b -> { if (Digger.active) Digger.stop(); build(); });
 
-        int w = miningLeftWidth();
-        int half = Math.max(47, (w - 5) / 2);
-        button("POS1 LOOK", x, y + 75, half, 23, Tone.NORMAL,
+        // Controls below this line live in the clip/scrolled viewport.
+        int contentY = cy + 104;
+        int left = splitMining() ? (cw - 36) / 2 : cw - 24;
+        int half = Math.max(50, (left - 7) / 2);
+        button("3D SELECT [0]", x, contentY, left, 29, Tone.PRIMARY,
+                b -> { onClose(); Selection3D.start(); });
+        button("POS1 LOOK", x, contentY + 42, half, 26, Tone.NORMAL,
                 b -> callAndRefresh(() -> Digger.setSavedLookedPoint(1, lookedPos)));
-        button("POS1 FEET", x + half + 5, y + 75, half, 23, Tone.NORMAL,
+        button("POS1 FEET", x + half + 7, contentY + 42, half, 26, Tone.MUTED,
                 b -> callAndRefresh(() -> Digger.setPoint(mc, 1)));
-        button("POS2 LOOK", x, y + 129, half, 23, Tone.NORMAL,
+        button("POS2 LOOK", x, contentY + 75, half, 26, Tone.NORMAL,
                 b -> callAndRefresh(() -> Digger.setSavedLookedPoint(2, lookedPos)));
-        button("POS2 FEET", x + half + 5, y + 129, half, 23, Tone.NORMAL,
+        button("POS2 FEET", x + half + 7, contentY + 75, half, 26, Tone.MUTED,
                 b -> callAndRefresh(() -> Digger.setPoint(mc, 2)));
 
-        button("DEPTH -", x, y + 182, half, 23, Tone.MUTED,
-                b -> callAndRefresh(() -> Settings.I.digDepth = Math.max(1, Settings.I.digDepth - 1)));
-        button("DEPTH +", x + half + 5, y + 182, half, 23, Tone.MUTED,
-                b -> callAndRefresh(() -> Settings.I.digDepth = Math.min(8, Settings.I.digDepth + 1)));
-        button("TURN -", x, y + 211, half, 23, Tone.MUTED,
-                b -> callAndRefresh(() -> Settings.I.digTurnSpeed = Math.max(2, Settings.I.digTurnSpeed - 1)));
-        button("TURN +", x + half + 5, y + 211, half, 23, Tone.MUTED,
-                b -> callAndRefresh(() -> Settings.I.digTurnSpeed = Math.min(20, Settings.I.digTurnSpeed + 1)));
-        if (y + 266 < cy + ch) {
-            button("CLEAR SELECTION", x, y + 244, w, 23, Tone.DANGER,
-                    b -> callAndRefresh(Digger::clearSelection));
-        }
+        button(toggle("3D BLOCK OUTLINE", s.digOverlay), x, contentY + 118, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digOverlay = !s.digOverlay));
+        button(toggle("GREEN WALK PREVIEW", s.digSafeWalkPreview), x, contentY + 153, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digSafeWalkPreview = !s.digSafeWalkPreview));
+        button(toggle("TOP-DOWN MINING", s.digTopDown), x, contentY + 188, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digTopDown = !s.digTopDown));
+        button(toggle("PROTECT CONTAINERS", s.digProtectContainers), x, contentY + 223, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digProtectContainers = !s.digProtectContainers));
+        button(toggle("STOP ON DAMAGE", s.digStopOnDamage), x, contentY + 258, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digStopOnDamage = !s.digStopOnDamage));
+        button(toggle("STOP WHEN HUNGRY", s.digStopOnLowHunger), x, contentY + 293, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digStopOnLowHunger = !s.digStopOnLowHunger));
+        button(toggle("MINING HUD", s.digHud), x, contentY + 328, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digHud = !s.digHud));
+
+        button("TURN -", x, contentY + 373, half, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.digTurnSpeed = Math.max(2, s.digTurnSpeed - 1)));
+        button("TURN +", x + half + 7, contentY + 373, half, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.digTurnSpeed = Math.min(20, s.digTurnSpeed + 1)));
+        button("DEPTH -", x, contentY + 408, half, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.digDepth = Math.max(1, s.digDepth - 1)));
+        button("DEPTH +", x + half + 7, contentY + 408, half, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.digDepth = Math.min(8, s.digDepth + 1)));
+        button("CLEAR AREA", x, contentY + 451, left, 29, Tone.DANGER,
+                b -> callAndRefresh(Selection3D::reset));
+
+        // Side panel is read-only, so its labels and preview scroll together.
+        virtualBottom = Math.max(virtualBottom, contentY + 486);
     }
 
     private void automation() {
