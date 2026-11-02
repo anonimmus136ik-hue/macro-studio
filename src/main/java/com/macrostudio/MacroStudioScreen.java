@@ -33,6 +33,7 @@ public final class MacroStudioScreen extends Screen {
     private static final int PURPLE = 0xFF9A8AFF;
     private static final int RED = 0xFFFF7184;
     private static final int GOLD = 0xFFD8BA80;
+    private static final int BLUE = 0xFF80AFFF;
 
     private static final String[] NAV = {"DASHBOARD", "MINING STUDIO", "SMART ROUTE", "BUILD STUDIO", "MARKET / ORES", "AUTOMATION", "MACROS", "BINDS", "DEPOSIT", "VISUAL", "PERFORMANCE", "SETTINGS"};
     private final List<UiButton> paintedButtons = new ArrayList<>();
