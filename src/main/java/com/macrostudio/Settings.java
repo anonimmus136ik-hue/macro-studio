@@ -28,6 +28,17 @@ public final class Settings {
 	public int digDepth = 2;
 	/** Maximum camera turn in degrees per client tick. */
 	public int digTurnSpeed = 6;
+    /** Preview options: no automatic server interactions. */
+    public boolean selectionVisuals = true;
+    public boolean showActiveLayer = true;
+    public boolean drillPreview = false;
+    public boolean digUp = false;
+    /** Window percentage of available GUI width, not global Minecraft GUI scale. */
+    public int uiWidthPercent = 84;
+    public int uiHeightPercent = 90;
+    public boolean marketAssistant = false;
+    public int marketPrice = 400;
+    public boolean[] resourceFilter = {true, true, true, true, true, true, true};
 	public boolean critSound = false;
 	public boolean[] keepSlots = defaultKeep();
 	public boolean noRain = false;
@@ -101,6 +112,10 @@ public final class Settings {
 					if (s.chests == null) s.chests = new ArrayList<>();
 					if (s.waypoints == null) s.waypoints = new ArrayList<>();
 					if (s.keepSlots == null || s.keepSlots.length != 36) s.keepSlots = defaultKeep();
+                    if (s.resourceFilter == null || s.resourceFilter.length != 7) s.resourceFilter = new boolean[] {true,true,true,true,true,true,true};
+                    s.uiWidthPercent = Math.max(55, Math.min(96, s.uiWidthPercent));
+                    s.uiHeightPercent = Math.max(65, Math.min(97, s.uiHeightPercent));
+                    s.marketPrice = Math.max(1, Math.min(100000000, s.marketPrice));
 					if (s.fullCmd == null) s.fullCmd = "";
 					if (s.backCmd == null) s.backCmd = "";
 					I = s;
