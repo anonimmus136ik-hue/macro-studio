@@ -83,7 +83,9 @@ public final class SmartPath {
         int y = mc.player.blockPosition().getY();
         Result best = new Result(List.of(), "NO SAFE ROUTE");
         // Stop beside an unwalkable mining column if necessary.
+        boolean onColumn = mc.player.blockPosition().getX() == x && mc.player.blockPosition().getZ() == z;
         for (int[] offset : new int[][] {{0,0},{1,0},{-1,0},{0,1},{0,-1},{2,0},{-2,0},{0,2},{0,-2}}) {
+            if (onColumn && offset[0] == 0 && offset[1] == 0) continue;
             Result candidate = plan(mc, new BlockPos(x + offset[0], y, z + offset[1]));
             if (candidate.found() && (!best.found() || candidate.path().size() < best.path().size()))
                 best = candidate;
