@@ -30,6 +30,7 @@ The Gradle wrapper uses Java 25 for Fabric Loom; the mod's class bytecode is Jav
 ### Market & resources
 - Resource selection and **real inventory totals** for diamonds, emeralds, gold, iron, redstone, coal and stone including raw/ingot/ore variants from loaded inventory.
 - Optional inventory resource counter HUD.
+- Optional **MINE SELECTED ORES ONLY** restricts Mining Studio targets to the chosen block classes in the selected area. Disabled by default; it is not a vein miner, path-to-hidden-ore finder or full auto-farm.
 - Price controls and **manual copy** of `/market sell PRICE`, only while holding a complete stack of 64 eligible, selected resource items (not tools or other valuables). The player checks the price and submits the chat command themselves.
 - No automatic selling, teleporting to warps, X-Ray, container manipulation or server-side market API integration.
 
