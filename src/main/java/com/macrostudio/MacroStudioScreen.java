@@ -287,6 +287,10 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(() -> s.marketPrice = Math.min(100000000, s.marketPrice + 50)));
         button(toggle("INVENTORY ORE HUD", s.resourceHud), x, y + 250, w, 25, Tone.NORMAL,
                 b -> callAndRefresh(() -> s.resourceHud = !s.resourceHud));
+        if (ch >= 347) {
+            button(toggle("MINE SELECTED ORES ONLY", s.mineSelectedOnly), x, y + 280, w, 25,
+                    Tone.NORMAL, b -> callAndRefresh(() -> s.mineSelectedOnly = !s.mineSelectedOnly));
+        }
         EditBox price = new EditBox(font, x, y + 187, w, 18, Component.literal("Exact sale price"));
         price.setMaxLength(9);
         price.setValue(String.valueOf(s.marketPrice));
