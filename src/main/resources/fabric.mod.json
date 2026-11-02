@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "macrostudio",
   "version": "${version}",
-  "name": "Macro Studio MAX 2.2",
-  "description": "Client macros, precise mining controls, inventory convenience and custom UI.",
+  "name": "Macro Studio MAX 2.3",
+  "description": "3D red/green mining selection on key 0, assisted top-down mining, safe preview and scrollable GUI.",
   "authors": [
     "Claude"
   ],
