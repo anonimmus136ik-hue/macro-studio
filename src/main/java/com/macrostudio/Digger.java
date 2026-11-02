@@ -251,6 +251,7 @@ public final class Digger {
         if (index >= path.size()) return null;
         int[] cell = path.get(index);
         BlockPos pos = new BlockPos(cell[0], cell[2], cell[1]);
+        if (Settings.I.mineSelectedOnly && !ResourceCatalog.matchesSelectedBlock(mc.level.getBlockState(pos))) return null;
         if (skipped.contains(pos) || mc.level.getBlockState(pos).isAir()) return null;
         if (underPlayer(mc, cell[0], cell[1]) && pos.getY() <= mc.player.blockPosition().getY()) return null;
         return mc.player.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) <= REACH && unobstructed(mc, pos) ? pos : null;
@@ -355,6 +356,13 @@ public final class Digger {
 
         int[] cell = path.get(index);
         BlockPos currentBlock = new BlockPos(cell[0], cell[2], cell[1]);
+        if (Settings.I.mineSelectedOnly
+                && !ResourceCatalog.matchesSelectedBlock(mc.level.getBlockState(currentBlock))) {
+            // Non-selected material is never mined or included as a visible target.
+            index++;
+            releaseKeys(mc);
+            return;
+        }
         if (mc.level.getBlockState(currentBlock).isAir() || skipped.contains(currentBlock)) {
             index++;
             releaseKeys(mc);
