@@ -22,6 +22,7 @@ public final class DrillAssist {
             return;
         }
         Settings.I.drillItemId = BuiltInRegistries.ITEM.getKey(mc.player.getMainHandItem().getItem()).toString();
+        Settings.I.drillItemName = mc.player.getMainHandItem().getHoverName().getString();
         Settings.save();
         Recorder.msg("Drill item saved: " + Settings.I.drillItemId);
     }
@@ -56,6 +57,7 @@ public final class DrillAssist {
                 ItemStack stack = inventory.getItem(slot);
                 if (!stack.isEmpty()
                         && BuiltInRegistries.ITEM.getKey(stack.getItem()).toString().equals(Settings.I.drillItemId)
+                        && (Settings.I.drillItemName.isBlank() || Settings.I.drillItemName.equals(stack.getHoverName().getString()))
                         && durable(stack)) {
                     inventory.setSelectedSlot(slot);
                     return;
@@ -71,7 +73,8 @@ public final class DrillAssist {
             ItemStack stack = inventory.getItem(slot);
             if (stack.isEmpty() || !durable(stack)) continue;
             if (!Settings.I.drillItemId.isBlank()
-                    && BuiltInRegistries.ITEM.getKey(stack.getItem()).toString().equals(Settings.I.drillItemId)) continue;
+                    && BuiltInRegistries.ITEM.getKey(stack.getItem()).toString().equals(Settings.I.drillItemId)
+                    && (Settings.I.drillItemName.isBlank() || Settings.I.drillItemName.equals(stack.getHoverName().getString()))) continue;
             if (!stack.isCorrectToolForDrops(state)) continue;
             float speed = stack.getDestroySpeed(state);
             if (speed > bestSpeed) {
