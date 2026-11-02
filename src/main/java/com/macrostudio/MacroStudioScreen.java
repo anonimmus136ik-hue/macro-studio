@@ -236,6 +236,14 @@ public final class MacroStudioScreen extends Screen {
         button("X +", x + half + 6, y + 204, half, 24, Tone.MUTED, b -> resizeAxis(0, 1));
         button("Z -", x, y + 233, half, 24, Tone.MUTED, b -> resizeAxis(2, -1));
         button("Z +", x + half + 6, y + 233, half, 24, Tone.MUTED, b -> resizeAxis(2, 1));
+        if (ch >= 355) {
+            button(toggle("DRILL TOOL ASSIST", s.drillAssist), x, y + 266, w, 24,
+                    Tone.NORMAL, b -> callAndRefresh(() -> s.drillAssist = !s.drillAssist));
+            button("SAVE HELD AS DRILL", x, y + 295, w, 24, Tone.MUTED,
+                    b -> callAndRefresh(() -> DrillAssist.captureHeld(Minecraft.getInstance())));
+            button("SET LOOKED BLOCK TYPE", x, y + 324, w, 24, Tone.MUTED,
+                    b -> callAndRefresh(() -> DrillAssist.captureBlock(Minecraft.getInstance(), lookedPos)));
+        }
     }
 
     private void resizeAxis(int axis, int delta) {
@@ -644,6 +652,7 @@ public final class MacroStudioScreen extends Screen {
                 line(g, "Overlay: native Minecraft lines, no X-Ray.", x, y + 25, GREY);
                 line(g, "Route: safe horizontal A* / avoid gaps.", x, y + 162, GREY);
                 line(g, "Mining direction: " + (Settings.I.digUp ? "UP" : "DOWN"), x, y + 183, GOLD);
+                line(g, "Drill ID: " + cut(Settings.I.drillItemId, Math.max(10,cw/7)), x, y + 198, GREY);
             }
             case BUILD -> {
                 line(g, "BUILD STUDIO  /  HOLOGRAM", x, y, BLUE);
