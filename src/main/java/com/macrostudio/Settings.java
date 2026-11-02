@@ -35,6 +35,7 @@ public final class Settings {
     public boolean drillPreview = false;
     public boolean drillAssist = false;
     public String drillItemId = "";
+    public String drillItemName = "";
     public String drillBlockId = "";
     public boolean digUp = false;
     /** Window percentage of available GUI width, not global Minecraft GUI scale. */
@@ -125,6 +126,7 @@ public final class Settings {
                     s.uiHeightPercent = Math.max(65, Math.min(97, s.uiHeightPercent));
                     s.marketPrice = Math.max(1, Math.min(100000000, s.marketPrice));
 					if (s.drillItemId == null) s.drillItemId = "";
+                    if (s.drillItemName == null) s.drillItemName = "";
                     if (s.drillBlockId == null) s.drillBlockId = "";
                     if (s.fullCmd == null) s.fullCmd = "";
 					if (s.backCmd == null) s.backCmd = "";
