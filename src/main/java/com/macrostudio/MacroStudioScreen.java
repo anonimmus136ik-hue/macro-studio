@@ -42,6 +42,7 @@ public final class MacroStudioScreen extends Screen {
     private String rename = "";
     private int macroPage = 0;
     private int bindsPage = 0;
+    private int navPage = 0;
     private int visualPage = 0;
     private String captureId;
     private Consumer<Integer> capture;
@@ -70,7 +71,7 @@ public final class MacroStudioScreen extends Screen {
 
     private static void rounded(GuiGraphics g, int x, int y, int w, int h, int color) {
         if (w <= 0 || h <= 0) return;
-        int r = Math.min(4, Math.min(w, h) / 3);
+        int r = Math.min(7, Math.min(w, h) / 3);
         g.fill(x + r, y, x + w - r, y + h, color);
         g.fill(x, y + r, x + w, y + h - r, color);
         g.fill(x + 1, y + 1, x + w - 1, y + h - 1, color);
@@ -116,11 +117,24 @@ public final class MacroStudioScreen extends Screen {
         ch = ph - 74;
         rowStep = Math.max(14, Math.min(30, (ph - 101) / NAV.length));
 
-        for (int i = 0; i < NAV.length; i++) {
+        int navRows = Math.min(NAV.length, Math.max(3, (ph - 120) / 22));
+        navPage = Math.max(0, Math.min(navPage, (NAV.length - 1) / navRows));
+        int navStart = navPage * navRows;
+        int tabHeight = Math.min(27, Math.max(16, (ph - 124) / navRows - 2));
+        int tabStep = tabHeight + 3;
+        for (int local = 0; local < navRows && navStart + local < NAV.length; local++) {
+            int i = navStart + local;
             final Tab t = Tab.values()[i];
-            button(NAV[i], px + 8, py + 68 + i * rowStep, side - 16,
-                    Math.min(26, rowStep - 2), tab == t ? Tone.SELECTED : Tone.MUTED,
+            button(NAV[i], px + 8, py + 67 + local * tabStep, side - 16,
+                    tabHeight, tab == t ? Tone.SELECTED : Tone.MUTED,
                     b -> { tab = t; build(); });
+        }
+        if (NAV.length > navRows) {
+            button("<", px + 8, py + ph - 52, Math.max(28, (side-22)/2), 23, Tone.MUTED,
+                    b -> { navPage = Math.max(0, navPage-1); build(); });
+            button(">", px + 11 + Math.max(28, (side-22)/2), py + ph - 52,
+                    Math.max(28, (side-22)/2), 23, Tone.MUTED,
+                    b -> { navPage = Math.min((NAV.length-1)/navRows,navPage+1); build(); });
         }
         button("X", px + pw - 34, py + 13, 22, 22, Tone.DANGER, b -> onClose());
         switch (tab) {
@@ -545,7 +559,8 @@ public final class MacroStudioScreen extends Screen {
         rounded(g, px - 2, py - 2, pw + 4, ph + 4, 0xFF33475D);
         rounded(g, px, py, pw, ph, BG);
         rounded(g, px + 4, py + 4, side - 2, ph - 8, PANEL);
-        g.fillGradient(px + side + 2, py + 45, px + pw - 3, py + 47, TEAL, PURPLE);
+        g.fillGradient(px + side + 2, py + 46, px + pw - 3, py + 48, GOLD, TEAL);
+        g.fill(px + 8, py + ph - 34, px + side - 3, py + ph - 33, 0xFF3E4D53);
         rounded(g, cx, cy, cw, ch, PANEL);
         g.fill(cx, cy, cx + cw, cy + 2, 0xFF273F55);
         if (tab == Tab.MINING) {
@@ -668,7 +683,8 @@ public final class MacroStudioScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
-        line(g, "M", px + 16, py + 18, TEAL);
+        rounded(g, px + 11, py + 12, 23, 24, 0xFF29392F);
+        line(g, "M", px + 19, py + 20, GOLD);
         line(g, "MACRO STUDIO  //  OBSIDIAN", px + side + 15, py + 16, WHITE);
         line(g, "ATELIER UI  /  1.21.11", px + side + 15, py + 29, GOLD);
         line(g, Recorder.active ? "REC" : Digger.active ? (Digger.isPaused() ? "PAUSED" : "MINING") : "READY",
