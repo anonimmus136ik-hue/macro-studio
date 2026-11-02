@@ -47,6 +47,7 @@ public class MacroStudioMod implements ClientModInitializer {
 		AutoEat.tick(mc);
 		ShulkerPreview.tick(mc);
 		Digger.tick(mc);
+        SelectionVisualizer.tick(mc);
 		Deposit.tick(mc);
 		Extras.tick(mc, down);
 		Optimize.tick(mc);
