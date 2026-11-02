@@ -22,16 +22,21 @@ public final class SelectionVisualizer {
     private static final int BLUE = 0xFF73A9FF;
     private static final int RED = 0xFFF07583;
 
+    private static long lastRouteTime = -1;
+    private static java.util.List<BlockPos> routeCache = java.util.List.of();
+
     private SelectionVisualizer() {}
 
     public static void tick(Minecraft mc) {
         if (mc == null || mc.player == null || mc.level == null || mc.options.hideGui) return;
         Settings s = Settings.I;
-        if (!s.selectionVisuals && !s.drillPreview) return;
+        if (!s.selectionVisuals && !s.drillPreview && !s.showRoute && !s.buildPreview) return;
 
         try (Gizmos.TemporaryCollection ignored = mc.collectPerTickGizmos()) {
             if (s.selectionVisuals) selection(mc, s);
             if (s.drillPreview) drill(mc);
+            if (s.showRoute) route(mc, s);
+            if (s.buildPreview) build(mc, s);
         }
     }
 
@@ -65,6 +70,46 @@ public final class SelectionVisualizer {
         Gizmos.cuboid(new BlockPos(b[0], b[1], b[2]), GizmoStyle.stroke(AMBER, 3f));
         if (Digger.currentTarget() != null && Digger.active) {
             Gizmos.cuboid(Digger.currentTarget(), GizmoStyle.stroke(RED, 3f));
+        }
+    }
+
+
+    private static void route(Minecraft mc, Settings s) {
+        if (s.dig2 == null || s.dig2.length < 3) return;
+        long gameTime = mc.level.getGameTime();
+        if (lastRouteTime < 0 || gameTime < lastRouteTime || gameTime - lastRouteTime >= 20) {
+            lastRouteTime = gameTime;
+            BlockPos dest = Digger.currentTarget() == null
+                    ? new BlockPos(s.dig2[0], s.dig2[1], s.dig2[2]) : Digger.currentTarget();
+            routeCache = SmartPath.toMiningColumn(mc, dest.getX(), dest.getZ()).path();
+        }
+        for (int i = 1; i < routeCache.size() && i < 96; i++) {
+            BlockPos prev = routeCache.get(i - 1), next = routeCache.get(i);
+            Gizmos.line(Vec3.atCenterOf(prev).add(0, -0.30, 0),
+                    Vec3.atCenterOf(next).add(0, -0.30, 0), BLUE, 3f);
+        }
+    }
+
+    private static void build(Minecraft mc, Settings s) {
+        if (s.dig1 == null || s.dig2 == null) return;
+        int[] a = s.dig1, b = s.dig2;
+        int minX = Math.min(a[0], b[0]), maxX = Math.max(a[0], b[0]) + 1;
+        int minZ = Math.min(a[2], b[2]), maxZ = Math.max(a[2], b[2]) + 1;
+        int minY = Math.min(a[1], b[1]), maxY = Math.max(a[1], b[1]) + 1;
+        if (mc.player.distanceToSqr((minX + maxX) / 2.0, mc.player.getY(),
+                (minZ + maxZ) / 2.0) > 128 * 128) return;
+        GizmoStyle style = GizmoStyle.strokeAndFill(BLUE, 2f, 0x1873A9FF);
+        switch (Math.floorMod(s.buildMode, 3)) {
+            case 0 -> Gizmos.cuboid(new AABB(minX, minY, minZ, maxX, minY + 1, maxZ), style);
+            case 1 -> {
+                Gizmos.cuboid(new AABB(minX, minY, minZ, minX + 1, maxY, maxZ), style);
+                Gizmos.cuboid(new AABB(maxX - 1, minY, minZ, maxX, maxY, maxZ), style);
+                if (maxX - minX > 2) {
+                    Gizmos.cuboid(new AABB(minX + 1, minY, minZ, maxX - 1, maxY, minZ + 1), style);
+                    Gizmos.cuboid(new AABB(minX + 1, minY, maxZ - 1, maxX - 1, maxY, maxZ), style);
+                }
+            }
+            default -> Gizmos.cuboid(new AABB(minX, minY, minZ, maxX, maxY, maxZ), style);
         }
     }
 
