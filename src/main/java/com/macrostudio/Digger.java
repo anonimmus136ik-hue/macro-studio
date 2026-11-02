@@ -292,7 +292,8 @@ public final class Digger {
             if (top == MISSING) continue;
             int[] col = path.get(i);
             if (underPlayer(mc, col[0], col[1])) continue;
-            for (int y = top; y > top - depth; y--) {
+            for (int level = 0; level < depth; level++) {
+                int y = Settings.I.digTopDown ? top - level : top - depth + 1 + level;
                 BlockPos pos = new BlockPos(col[0], y, col[1]);
                 if (skipped.contains(pos)) continue;
                 BlockState state = mc.level.getBlockState(pos);
