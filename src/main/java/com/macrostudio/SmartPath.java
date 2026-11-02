@@ -3,6 +3,10 @@ package com.macrostudio;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 
@@ -78,19 +82,34 @@ public final class SmartPath {
         return new Result(List.of(), "NO SAFE ROUTE");
     }
 
-    public static Result toMiningColumn(Minecraft mc, int x, int z) {
-        if (mc == null || mc.player == null) return new Result(List.of(), "NO WORLD");
+    /** Choose a reachable stand with safe feet AND real vanilla line of sight to target. */
+    public static Result toMiningColumn(Minecraft mc, BlockPos target) {
+        if (mc == null || mc.player == null || mc.level == null || target == null)
+            return new Result(List.of(), "NO WORLD");
+        int x = target.getX(), z = target.getZ();
         int y = mc.player.blockPosition().getY();
-        Result best = new Result(List.of(), "NO SAFE ROUTE");
-        // Stop beside an unwalkable mining column if necessary.
+        Result best = new Result(List.of(), "NO SAFE REACHABLE STAND");
         boolean onColumn = mc.player.blockPosition().getX() == x && mc.player.blockPosition().getZ() == z;
         for (int[] offset : new int[][] {{0,0},{1,0},{-1,0},{0,1},{0,-1},{2,0},{-2,0},{0,2},{0,-2}}) {
             if (onColumn && offset[0] == 0 && offset[1] == 0) continue;
-            Result candidate = plan(mc, new BlockPos(x + offset[0], y, z + offset[1]));
+            BlockPos stand = new BlockPos(x + offset[0], y, z + offset[1]);
+            if (!visibleFrom(mc, stand, target)) continue;
+            Result candidate = plan(mc, stand);
             if (candidate.found() && (!best.found() || candidate.path().size() < best.path().size()))
                 best = candidate;
         }
         return best;
+    }
+
+    private static boolean visibleFrom(Minecraft mc, BlockPos stand, BlockPos target) {
+        if (!walkable(mc, stand)) return false;
+        double eyeHeight = mc.player.getEyePosition().y - mc.player.getY();
+        Vec3 eye = new Vec3(stand.getX()+.5, stand.getY()+eyeHeight, stand.getZ()+.5);
+        Vec3 center = Vec3.atCenterOf(target);
+        if (eye.distanceTo(center) > 4.3) return false;
+        BlockHitResult hit = mc.level.clip(new ClipContext(
+                eye, center, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player));
+        return hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(target);
     }
 
     private static int heuristic(BlockPos a, BlockPos b) {
