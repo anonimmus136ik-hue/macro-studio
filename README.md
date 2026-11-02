@@ -8,7 +8,7 @@ Fabric client-side mod for **Minecraft Java 1.21.11** (official Mojang mappings)
 2. Download the latest **successful** `MacroStudio-MAX-2.3.0` artifact.
 3. Extract `macro-studio-2.3.0.jar` from that ZIP.
 4. Put the JAR into the Fabric 1.21.11 instance's `mods` directory. Install the matching Fabric API, and remove older Macro Studio JARs.
-5. **Right Ctrl** opens the in-game menu. The text **Obsidian Edition** at the top identifies this version.
+5. **Right Ctrl** opens the in-game menu, **F7** toggles macro recording and **F8** stops automation (default mappings, rebindable under Settings). The text **Obsidian Edition** at the top identifies this version.
 
 The Gradle wrapper uses Java 25 for Fabric Loom; the mod's class bytecode is Java 21.
 
