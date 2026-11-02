@@ -41,6 +41,8 @@ public final class Digger {
     private static int index = 0;
     private static int referenceY = 0;
     private static int depth = 1;
+    private static int lowestY = 0;
+    private static float previousHealth = -1;
     private static BlockPos target = null;
     private static int targetTicks = 0;
     private static boolean manualPause = false;
@@ -67,6 +69,16 @@ public final class Digger {
         return (Math.abs((long) a[0] - b[0]) + 1L) * (Math.abs((long) a[2] - b[2]) + 1L);
     }
 
+    /** Amount of blocks in the selected rectangular prism. */
+    public static long selectedVolume() {
+        if (!validPoint(Settings.I.dig1) || !validPoint(Settings.I.dig2)) return 0;
+        int topY = Settings.I.digHeightPoint == null || Settings.I.digHeightPoint.length < 3
+                ? Settings.I.dig1[1] : Settings.I.digHeightPoint[1];
+        long h = Settings.I.digHeightPoint == null ? Settings.I.digDepth
+                : Math.abs((long) topY - Settings.I.dig1[1]) + 1L;
+        return selectedCells() * h;
+    }
+
     private static boolean validPoint(int[] point) {
         return point != null && point.length >= 3;
     }
@@ -75,6 +87,8 @@ public final class Digger {
         if (active) stop();
         Settings.I.dig1 = null;
         Settings.I.dig2 = null;
+        Settings.I.digHeightPoint = null;
+        Settings.I.digDimension = "";
         path.clear();
         topCache.clear();
         skipped.clear();
@@ -113,6 +127,9 @@ public final class Digger {
         int[] point = {pos.getX(), pos.getY(), pos.getZ()};
         if (which == 1) Settings.I.dig1 = point;
         else Settings.I.dig2 = point;
+        Settings.I.digHeightPoint = null;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level != null) Settings.I.digDimension = mc.level.dimension().identifier().toString();
         status = "Выбрана точка " + which;
         Settings.save();
         Recorder.msg("Точка " + which + ": " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ());
@@ -123,13 +140,23 @@ public final class Digger {
             fail("Сначала войди в мир");
             return;
         }
+        if (Selection3D.selecting()) {
+            fail("Заверши 3D выделение тремя кликами или нажми 0");
+            return;
+        }
         if (!validPoint(Settings.I.dig1) || !validPoint(Settings.I.dig2)) {
             fail("Нужно выбрать обе точки (Pos1 / Pos2)");
             return;
         }
         long count = selectedCells();
-        if (count <= 0 || count > MAX_CELLS) {
-            fail("Площадь должна быть от 1 до " + MAX_CELLS + " колонок");
+        if (count <= 0 || count > MAX_CELLS || selectedVolume() > 65536L) {
+            fail("Слишком большая область (максимум 16384 колонок и 65536 блоков)");
+            return;
+        }
+        String dim = mc.level.dimension().identifier().toString();
+        if (Settings.I.digDimension != null && !Settings.I.digDimension.isEmpty()
+                && !dim.equals(Settings.I.digDimension)) {
+            fail("Область выбрана в другом измерении. Нажми 0 и выбери снова");
             return;
         }
         if (Replayer.active) Replayer.stop();
@@ -140,8 +167,16 @@ public final class Digger {
         int maxX = Math.max(a[0], b[0]);
         int minZ = Math.min(a[2], b[2]);
         int maxZ = Math.max(a[2], b[2]);
-        referenceY = Math.max(a[1], b[1]);
-        depth = Mth.clamp(Settings.I.digDepth, 1, 8);
+        if (validPoint(Settings.I.digHeightPoint)) {
+            int height = Settings.I.digHeightPoint[1];
+            referenceY = Math.max(a[1], height);
+            lowestY = Math.min(a[1], height);
+            depth = referenceY - lowestY + 1;
+        } else {
+            referenceY = Math.max(a[1], b[1]);
+            depth = Mth.clamp(Settings.I.digDepth, 1, 8);
+            lowestY = referenceY - depth + 1;
+        }
         path.clear();
         int row = 0;
         for (int z = minZ; z <= maxZ; z++, row++) {
@@ -158,11 +193,12 @@ public final class Digger {
         targetTicks = 0;
         noMovementTicks = 0;
         lastWalkPosition = mc.player.position();
+        previousHealth = mc.player.getHealth();
         paused = false;
         manualPause = false;
         active = true;
         lastError = "";
-        status = "Запущено: " + path.size() + " колонок";
+        status = "Запущено: " + path.size() + " колонок, сверху вниз";
         Recorder.msg("Копатель запущен. STOP — в меню");
     }
 
@@ -229,7 +265,8 @@ public final class Digger {
         if (cached != null) return cached;
         int[] cell = path.get(i);
         int result = MISSING;
-        for (int y = referenceY + 3; y >= referenceY - 8; y--) {
+        for (int y = validPoint(Settings.I.digHeightPoint) ? referenceY : referenceY + 3;
+                y >= (validPoint(Settings.I.digHeightPoint) ? lowestY : referenceY - 8); y--) {
             BlockState state = mc.level.getBlockState(new BlockPos(cell[0], y, cell[1]));
             if (safeFloor(state)) {
                 result = y;
@@ -255,9 +292,17 @@ public final class Digger {
             if (top == MISSING) continue;
             int[] col = path.get(i);
             if (underPlayer(mc, col[0], col[1])) continue;
-            for (int y = top; y > top - depth; y--) {
+            for (int level = 0; level < depth; level++) {
+                int y = Settings.I.digTopDown ? top - level : top - depth + 1 + level;
                 BlockPos pos = new BlockPos(col[0], y, col[1]);
-                if (skipped.contains(pos) || mc.level.getBlockState(pos).isAir()) continue;
+                if (skipped.contains(pos)) continue;
+                BlockState state = mc.level.getBlockState(pos);
+                if (state.isAir() || state.getDestroySpeed(mc.level, pos) < 0) continue;
+                if (!state.getFluidState().isEmpty()) { skipped.add(pos); continue; }
+                if (Settings.I.digProtectContainers && mc.level.getBlockEntity(pos) != null) {
+                    skipped.add(pos);
+                    continue;
+                }
                 Vec3 center = Vec3.atCenterOf(pos);
                 if (eye.distanceTo(center) <= REACH && unobstructed(mc, pos)) return pos;
             }
@@ -325,6 +370,16 @@ public final class Digger {
         }
         if (mc.gameMode == null) {
             stop();
+            return;
+        }
+        if (Settings.I.digStopOnDamage && previousHealth >= 0
+                && mc.player.getHealth() < previousHealth) {
+            halt("Получен урон — аварийная остановка");
+            return;
+        }
+        previousHealth = mc.player.getHealth();
+        if (Settings.I.digStopOnLowHunger && mc.player.getFoodData().getFoodLevel() <= 6) {
+            halt("Мало сытости — аварийная остановка");
             return;
         }
 

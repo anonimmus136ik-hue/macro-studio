@@ -46,11 +46,17 @@ public final class MacroStudioScreen extends Screen {
     private Consumer<Integer> capture;
     private int px, py, pw, ph, side, cx, cy, cw, ch, rowStep;
     private int[] lookedPos;
+    private int scrollPx;
+    private int scrollMax;
+    private int scrollTop;
+    private int scrollBottom;
+    private int virtualBottom;
+    private boolean buildingContent;
 
-    private record UiButton(Button button, String caption, Tone tone) {}
+    private record UiButton(Button button, String caption, Tone tone, boolean content) {}
 
     public MacroStudioScreen() {
-        super(Component.literal("Macro Studio MAX 2.2.0"));
+        super(Component.literal("Macro Studio MAX 2.3.0"));
         Minecraft mc = Minecraft.getInstance();
         if (mc.hitResult instanceof BlockHitResult hit && mc.hitResult.getType() == HitResult.Type.BLOCK) {
             lookedPos = new int[] {hit.getBlockPos().getX(), hit.getBlockPos().getY(), hit.getBlockPos().getZ()};
@@ -86,13 +92,32 @@ public final class MacroStudioScreen extends Screen {
     }
 
     private Button button(String caption, int x, int y, int w, int h, Tone tone, Button.OnPress action) {
+        boolean fixedFooter = (tab == Tab.MACROS || tab == Tab.BINDS) && y >= cy + ch - 38;
+        boolean inContent = buildingContent && x >= cx && y >= scrollTop && !fixedFooter;
+        if (inContent) {
+            virtualBottom = Math.max(virtualBottom, y + h);
+            y -= scrollPx;
+            // Never register buttons that escape their scroll viewport. This also
+            // prevents invisible/out-of-frame widgets from catching mouse clicks.
+            if (y < scrollTop || y + h > scrollBottom) return null;
+        }
         Button b = Button.builder(Component.literal(caption), action).bounds(x, y, w, h).build();
         // Native button still receives mouse, keyboard and narration input.
         // Custom paint is drawn after the standard widget render.
         b.setAlpha(0.0f);
         addRenderableWidget(b);
-        paintedButtons.add(new UiButton(b, caption, tone));
+        paintedButtons.add(new UiButton(b, caption, tone, inContent));
         return b;
+    }
+
+    private void addContentEdit(EditBox e) {
+        if (buildingContent && tab != Tab.MACROS && tab != Tab.BINDS) {
+            int yy = e.getY();
+            virtualBottom = Math.max(virtualBottom, yy + e.getHeight());
+            e.setY(yy - scrollPx);
+            if (e.getY() < scrollTop || e.getY() + e.getHeight() > scrollBottom) return;
+        }
+        addRenderableWidget(e);
     }
 
     private void callAndRefresh(Runnable r) {
@@ -114,14 +139,20 @@ public final class MacroStudioScreen extends Screen {
         cw = px + pw - 11 - cx;
         ch = ph - 74;
         rowStep = Math.max(18, Math.min(30, (ph - 107) / NAV.length));
+        scrollTop = cy + (tab == Tab.MINING ? 93 : 33);
+        scrollBottom = cy + ch - 10;
+        virtualBottom = scrollTop;
+        scrollPx = Math.max(0, Math.min(scrollPx, scrollMax));
+        buildingContent = false;
 
         for (int i = 0; i < NAV.length; i++) {
             final Tab t = Tab.values()[i];
             button(NAV[i], px + 8, py + 68 + i * rowStep, side - 16,
                     Math.min(26, rowStep - 2), tab == t ? Tone.SELECTED : Tone.MUTED,
-                    b -> { tab = t; build(); });
+                    b -> { tab = t; scrollPx = 0; scrollMax = 0; build(); });
         }
         button("X", px + pw - 34, py + 13, 22, 22, Tone.DANGER, b -> onClose());
+        buildingContent = true;
         switch (tab) {
             case HOME -> home();
             case MINING -> mining();
@@ -133,6 +164,10 @@ public final class MacroStudioScreen extends Screen {
             case PERF -> performance();
             case SETTINGS -> settings();
         }
+        buildingContent = false;
+        scrollMax = (tab == Tab.MACROS || tab == Tab.BINDS) ? 0
+                : Math.max(0, virtualBottom - scrollBottom + 9);
+        scrollPx = Math.min(scrollPx, scrollMax);
     }
 
     private void home() {
@@ -160,44 +195,66 @@ public final class MacroStudioScreen extends Screen {
 
     private void mining() {
         Minecraft mc = Minecraft.getInstance();
-        int x = cx + 12, y = cy + 30;
+        Settings s = Settings.I;
+        int x = cx + 12, y = cy + 27;
         int gap = 7;
-        int buttonsW = cw - 24;
-        int third = (buttonsW - gap * 2) / 3;
-        // Always visible at the top, even at a small GUI scale.
-        button("START", x, y, third, 29, Tone.PRIMARY, b -> {
+        int full = Math.max(126, cw - 24);
+        int third = (full - gap * 2) / 3;
+        // These emergency controls NEVER scroll away.
+        button("START", x, y, third, 30, Tone.PRIMARY, b -> {
             if (Digger.active && Digger.userPaused()) Digger.togglePause();
             else if (!Digger.active) Digger.start(mc);
             if (Digger.active && !Digger.isPaused()) onClose();
             else build();
         });
         button(Digger.userPaused() ? "RESUME" : "PAUSE", x + third + gap, y,
-                third, 29, Tone.NORMAL, b -> { Digger.togglePause(); build(); });
-        button("STOP", x + (third + gap) * 2, y, third, 29, Tone.DANGER, b -> { Digger.stop(); build(); });
+                third, 30, Tone.NORMAL, b -> { Digger.togglePause(); build(); });
+        button("STOP", x + (third + gap) * 2, y, third, 30, Tone.DANGER,
+                b -> { if (Digger.active) Digger.stop(); build(); });
 
-        int w = miningLeftWidth();
-        int half = Math.max(47, (w - 5) / 2);
-        button("POS1 LOOK", x, y + 75, half, 23, Tone.NORMAL,
+        // Controls below this line live in the clip/scrolled viewport.
+        int contentY = cy + 104;
+        int left = splitMining() ? (cw - 36) / 2 : cw - 24;
+        int half = Math.max(50, (left - 7) / 2);
+        button("3D SELECT [0]", x, contentY, left, 29, Tone.PRIMARY,
+                b -> { onClose(); Selection3D.start(); });
+        button("POS1 LOOK", x, contentY + 42, half, 26, Tone.NORMAL,
                 b -> callAndRefresh(() -> Digger.setSavedLookedPoint(1, lookedPos)));
-        button("POS1 FEET", x + half + 5, y + 75, half, 23, Tone.NORMAL,
+        button("POS1 FEET", x + half + 7, contentY + 42, half, 26, Tone.MUTED,
                 b -> callAndRefresh(() -> Digger.setPoint(mc, 1)));
-        button("POS2 LOOK", x, y + 129, half, 23, Tone.NORMAL,
+        button("POS2 LOOK", x, contentY + 75, half, 26, Tone.NORMAL,
                 b -> callAndRefresh(() -> Digger.setSavedLookedPoint(2, lookedPos)));
-        button("POS2 FEET", x + half + 5, y + 129, half, 23, Tone.NORMAL,
+        button("POS2 FEET", x + half + 7, contentY + 75, half, 26, Tone.MUTED,
                 b -> callAndRefresh(() -> Digger.setPoint(mc, 2)));
 
-        button("DEPTH -", x, y + 182, half, 23, Tone.MUTED,
-                b -> callAndRefresh(() -> Settings.I.digDepth = Math.max(1, Settings.I.digDepth - 1)));
-        button("DEPTH +", x + half + 5, y + 182, half, 23, Tone.MUTED,
-                b -> callAndRefresh(() -> Settings.I.digDepth = Math.min(8, Settings.I.digDepth + 1)));
-        button("TURN -", x, y + 211, half, 23, Tone.MUTED,
-                b -> callAndRefresh(() -> Settings.I.digTurnSpeed = Math.max(2, Settings.I.digTurnSpeed - 1)));
-        button("TURN +", x + half + 5, y + 211, half, 23, Tone.MUTED,
-                b -> callAndRefresh(() -> Settings.I.digTurnSpeed = Math.min(20, Settings.I.digTurnSpeed + 1)));
-        if (y + 266 < cy + ch) {
-            button("CLEAR SELECTION", x, y + 244, w, 23, Tone.DANGER,
-                    b -> callAndRefresh(Digger::clearSelection));
-        }
+        button(toggle("3D BLOCK OUTLINE", s.digOverlay), x, contentY + 118, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digOverlay = !s.digOverlay));
+        button(toggle("GREEN WALK PREVIEW", s.digSafeWalkPreview), x, contentY + 153, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digSafeWalkPreview = !s.digSafeWalkPreview));
+        button(toggle("TOP-DOWN MINING", s.digTopDown), x, contentY + 188, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digTopDown = !s.digTopDown));
+        button(toggle("PROTECT CONTAINERS", s.digProtectContainers), x, contentY + 223, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digProtectContainers = !s.digProtectContainers));
+        button(toggle("STOP ON DAMAGE", s.digStopOnDamage), x, contentY + 258, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digStopOnDamage = !s.digStopOnDamage));
+        button(toggle("STOP WHEN HUNGRY", s.digStopOnLowHunger), x, contentY + 293, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digStopOnLowHunger = !s.digStopOnLowHunger));
+        button(toggle("MINING HUD", s.digHud), x, contentY + 328, left, 28,
+                Tone.NORMAL, b -> callAndRefresh(() -> s.digHud = !s.digHud));
+
+        button("TURN -", x, contentY + 373, half, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.digTurnSpeed = Math.max(2, s.digTurnSpeed - 1)));
+        button("TURN +", x + half + 7, contentY + 373, half, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.digTurnSpeed = Math.min(20, s.digTurnSpeed + 1)));
+        button("DEPTH -", x, contentY + 408, half, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.digDepth = Math.max(1, s.digDepth - 1)));
+        button("DEPTH +", x + half + 7, contentY + 408, half, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.digDepth = Math.min(8, s.digDepth + 1)));
+        button("CLEAR AREA", x, contentY + 451, left, 29, Tone.DANGER,
+                b -> callAndRefresh(Selection3D::reset));
+
+        // Side panel is read-only, so its labels and preview scroll together.
+        virtualBottom = Math.max(virtualBottom, contentY + 486);
     }
 
     private void automation() {
@@ -290,7 +347,7 @@ public final class MacroStudioScreen extends Screen {
             box.setMaxLength(200);
             box.setValue(bd.lines == null ? "" : bd.lines);
             box.setResponder(v -> bd.lines = v);
-            addRenderableWidget(box);
+            addContentEdit(box);
             button("X", cx + cw - 39, yy, 24, 24, Tone.DANGER,
                     b -> callAndRefresh(() -> s.binds.remove(bd)));
         }
@@ -317,10 +374,10 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(s.chests::clear));
         EditBox before = new EditBox(font, x, y + 98, w, 20, Component.literal("Command when full"));
         before.setMaxLength(200); before.setValue(s.fullCmd); before.setResponder(v -> s.fullCmd = v);
-        addRenderableWidget(before);
+        addContentEdit(before);
         EditBox after = new EditBox(font, x, y + 151, w, 20, Component.literal("Return command"));
         after.setMaxLength(200); after.setValue(s.backCmd); after.setResponder(v -> s.backCmd = v);
-        addRenderableWidget(after);
+        addContentEdit(after);
         int gridWidth = Math.min(w, 9 * 24);
         int gap = gridWidth / 9;
         for (int row = 0; row < 4; row++) for (int col = 0; col < 9; col++) {
@@ -429,7 +486,7 @@ public final class MacroStudioScreen extends Screen {
         build();
     }
 
-    private static String toggle(String name, boolean on) { return name + (on ? "   [ON]" : "   [OFF]"); }
+    private static String toggle(String name, boolean on) { return (on ? "[x] " : "[ ] ") + name; }
     private static String cut(String s, int len) { return s.length() > len ? s.substring(0, len - 2) + ".." : s; }
     private static String point(int[] p) { return p == null || p.length < 3 ? "NOT SET" : p[0] + "  /  " + p[1] + "  /  " + p[2]; }
 
@@ -471,22 +528,27 @@ public final class MacroStudioScreen extends Screen {
     }
 
     private void renderSelectionGrid(GuiGraphics g, int x, int y, int w, int h) {
-        rounded(g, x, y, w, h, 0xFF101724);
+        if (w < 30 || h < 30) return;
+        rounded(g, x, y, w, h, 0xFF0B1220);
         int[] a = Settings.I.dig1, b = Settings.I.dig2;
         if (a == null || b == null || a.length < 3 || b.length < 3) {
-            g.drawCenteredString(font, "SELECT POS1 + POS2", x + w / 2, y + h / 2 - 4, GREY);
+            g.drawCenteredString(font, "PRESS 0 + 3 RIGHT CLICKS", x + w / 2, y + h / 2 - 4, GREY);
             return;
         }
-        int cols = (int) Math.min(19, Math.abs((long) a[0] - b[0]) + 1);
-        int rows = (int) Math.min(10, Math.abs((long) a[2] - b[2]) + 1);
-        int cell = Math.max(2, Math.min((w - 10) / cols, (h - 10) / rows));
-        int ox = x + (w - cols * cell) / 2;
-        int oy = y + (h - rows * cell) / 2;
-        for (int row = 0; row < rows; row++) for (int col = 0; col < cols; col++) {
-            int sx = ox + col * cell, sy = oy + row * cell;
-            g.fill(sx, sy, sx + cell - 1, sy + cell - 1, (row % 2 == 0 ? 0xFF3D978F : 0xFF356C81));
+        int cols = (int) Math.min(22, Math.abs((long) a[0] - b[0]) + 1);
+        int rows = (int) Math.min(13, Math.abs((long) a[2] - b[2]) + 1);
+        int cell = Math.max(2, Math.min((w - 16) / (cols + 2), (h - 16) / (rows + 2)));
+        int ox = x + (w - (cols + 2) * cell) / 2;
+        int oy = y + (h - (rows + 2) * cell) / 2;
+        for (int row = -1; row <= rows; row++) for (int col = -1; col <= cols; col++) {
+            boolean exterior = row == -1 || col == -1 || row == rows || col == cols;
+            if (exterior && !Settings.I.digSafeWalkPreview) continue;
+            int sx = ox + (col + 1) * cell, sy = oy + (row + 1) * cell;
+            int color = exterior ? 0xFF238B63 : (row + col) % 2 == 0 ? 0xFFB5455C : 0xFF942D43;
+            g.fill(sx, sy, sx + cell - 1, sy + cell - 1, color);
         }
-        g.fill(ox, oy, ox + Math.max(2, cell - 1), oy + Math.max(2, cell - 1), GOLD);
+        g.fill(ox + cell, oy + cell, ox + cell + Math.max(2, cell - 1),
+                oy + cell + Math.max(2, cell - 1), GOLD);
     }
 
     private void drawPage(GuiGraphics g) {
@@ -500,38 +562,50 @@ public final class MacroStudioScreen extends Screen {
                 line(g, "REPLAY: " + (Replayer.active ? "ACTIVE" : "IDLE"), x, y + 245, GREY);
             }
             case MINING -> {
-                line(g, "MINING STUDIO  /  ACTIVE CONTROLS", x, y, TEAL);
-                int ly = cy + 30;
-                int leftW = miningLeftWidth();
-                line(g, "POINT 1 / " + cut(point(Settings.I.dig1), Math.max(12, leftW / 6)), x, ly + 61, WHITE);
-                line(g, "POINT 2 / " + cut(point(Settings.I.dig2), Math.max(12, leftW / 6)), x, ly + 116, WHITE);
-                line(g, "DEPTH: " + Settings.I.digDepth + " LAYERS", x, ly + 168, GOLD);
-                line(g, "TURN: " + Settings.I.digTurnSpeed + " DEG/TICK", x, ly + 238, TEAL);
+                int base = cy + 104;
+                int leftW = splitMining() ? (cw - 36) / 2 : cw - 24;
+                line(g, "SELECT THE DIGGING VOLUME", x, base - 12, TEAL);
+                line(g, "POS1: " + cut(point(Settings.I.dig1), Math.max(13, leftW / 6)), x, base + 32, GREY);
+                line(g, "POS2: " + cut(point(Settings.I.dig2), Math.max(13, leftW / 6)), x, base + 66, GREY);
+                int[] hp = Settings.I.digHeightPoint;
+                line(g, "HEIGHT Y: " + (hp == null ? "SET WITH THIRD RIGHT CLICK" : hp[1]),
+                        x, base + 107, GOLD);
+                line(g, "TURN RATE: " + Settings.I.digTurnSpeed + " deg/tick", x, base + 364, TEAL);
+                line(g, "LEGACY DEPTH: " + Settings.I.digDepth, x, base + 399, GOLD);
                 if (splitMining()) {
-                    int rightX = x + leftW + 12;
-                    int rightW = cw - 26 - leftW - 12;
-                    line(g, "AREA / TOP VIEW", rightX + 5, ly + 46, PURPLE);
-                    renderSelectionGrid(g, rightX, ly + 60, rightW, 115);
-                    line(g, "COLUMNS " + Digger.selectedCells(), rightX + 5, ly + 185, GREY);
-                    line(g, "STATUS: " + cut(Digger.status(), Math.max(12, rightW / 6)), rightX + 5, ly + 199,
+                    int rightX = x + leftW + 14, rightW = cw - 30 - leftW - 14;
+                    drawCard(g, rightX, base, rightW, 287);
+                    line(g, "3D MINING MAP", rightX + 10, base + 12, WHITE);
+                    renderSelectionGrid(g, rightX + 7, base + 35, rightW - 14, 139);
+                    line(g, "RED  = MINE BLOCKS", rightX + 9, base + 183, RED);
+                    line(g, "GREEN = FLOOR PREVIEW", rightX + 9, base + 198, TEAL);
+                    line(g, "COLUMNS: " + Digger.selectedCells(), rightX + 9, base + 219, GREY);
+                    line(g, "VOLUME: " + Digger.selectedVolume(), rightX + 9, base + 234, GREY);
+                    line(g, "BLOCKS SKIPPED: " + Digger.skippedBlocks(), rightX + 9, base + 249, GREY);
+                    int barY = base + 273;
+                    rounded(g, rightX + 8, barY, rightW - 16, 6, 0xFF39455C);
+                    rounded(g, rightX + 8, barY, (rightW - 16) * Digger.progressPercent() / 100, 6, TEAL);
+                    drawCard(g, rightX, base + 300, rightW, 88);
+                    line(g, "MINER STATUS", rightX + 9, base + 313, PURPLE);
+                    line(g, cut(Digger.status(), Math.max(11, rightW / 6)), rightX + 9, base + 335,
                             Digger.active ? TEAL : GREY);
-                    int barY = ly + 223;
-                    rounded(g, rightX + 4, barY, rightW - 8, 8, 0xFF34445A);
-                    rounded(g, rightX + 4, barY,
-                            (rightW - 8) * Digger.progressPercent() / 100, 8, TEAL);
-                    line(g, Digger.progressPercent() + "%  /  " + Digger.completedCells() + "/" + Digger.totalCells(), rightX + 5, barY + 14, GREY);
-                } else if (ch >= 340) {
-                    line(g, "STATUS: " + cut(Digger.status(), Math.max(15, cw / 6)), x, ly + 279, GREY);
-                }
-                if (!Digger.lastError().isEmpty() && ch >= 390) {
-                    line(g, cut(Digger.lastError(), Math.max(30, cw / 6)), x, cy + ch - 18, RED);
+                    line(g, Digger.progressPercent() + "%   " + Digger.completedCells() + "/" + Digger.totalCells(),
+                            rightX + 9, base + 353, WHITE);
+                    if (!Digger.lastError().isEmpty())
+                        line(g, cut(Digger.lastError(), Math.max(11, rightW / 6)), rightX + 9, base + 370, RED);
+                } else {
+                    int infoY = base + 495;
+                    line(g, "RED = MINE / GREEN = WALK PREVIEW", x, infoY, TEAL);
+                    renderSelectionGrid(g, x, infoY + 18, cw - 28, 110);
+                    line(g, "VOLUME: " + Digger.selectedVolume() + " BLOCKS", x, infoY + 141, GOLD);
+                    line(g, cut(Digger.status(), Math.max(20, cw / 6)), x, infoY + 158, GREY);
                 }
             }
             case AUTO -> {
                 line(g, "AUTOMATION / INSTALLED MODULES", x, y, TEAL);
                 line(g, "Food threshold: " + Settings.I.eatBelow + " / 20", x, y + 149, GOLD);
                 line(g, "Only real modules have ON/OFF controls.", x, y + 253, GREY);
-                line(g, "Auto Fish / Farm / Build are not installed yet.", x, y + 267, GREY);
+                line(g, "Auto Fish / Farm are not installed.", x, y + 267, GREY);
             }
             case MACROS -> {
                 line(g, "MACRO LIBRARY", x, y, TEAL);
@@ -564,32 +638,105 @@ public final class MacroStudioScreen extends Screen {
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (mouseX >= cx && mouseX < cx + cw && mouseY >= scrollTop && mouseY <= scrollBottom
+                && scrollMax > 0 && Math.abs(verticalAmount) > 0.0001) {
+            int delta = (int) Math.round(verticalAmount * 28.0);
+            if (delta == 0) delta = verticalAmount > 0 ? 18 : -18;
+            int next = Math.max(0, Math.min(scrollMax, scrollPx - delta));
+            if (scrollPx != next) {
+                scrollPx = next;
+                build();
+            }
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    private void paintButton(GuiGraphics g, UiButton ui) {
+        Button b = ui.button();
+        int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
+        boolean hot = b.isHoveredOrFocused();
+        boolean check = ui.caption().startsWith("[x] ") || ui.caption().startsWith("[ ] ");
+        boolean checked = ui.caption().startsWith("[x] ");
+        int bg = switch (ui.tone()) {
+            case PRIMARY -> hot ? 0xFF68EAC7 : 0xFF207F7B;
+            case DANGER -> hot ? 0xFFDE748A : 0xFF7C3248;
+            case SELECTED -> hot ? 0xFF405A7B : 0xFF2B4566;
+            case MUTED -> hot ? 0xFF32435A : 0xFF1B2A3C;
+            case NORMAL -> hot ? 0xFF304F66 : 0xFF1F3248;
+        };
+        rounded(g, x, y, w, h, hot ? 0xFF77CED1 : 0xFF263B50);
+        rounded(g, x + 1, y + 1, w - 2, h - 2, bg);
+        if (ui.tone() == Tone.SELECTED) g.fill(x + 1, y + 3, x + 4, y + h - 3, TEAL);
+        int fg = ui.tone() == Tone.PRIMARY && hot ? 0xFF07151B : WHITE;
+        if (check) {
+            int bx = x + 9, by = y + Math.max(2, (h - 15) / 2);
+            g.fill(bx, by, bx + 15, by + 15, checked ? 0xFF3BD7AA : 0xFF547085);
+            g.fill(bx + 2, by + 2, bx + 13, by + 13, checked ? 0xFF3BD7AA : 0xFF132334);
+            if (checked) {
+                // Pixel-painted checkmark: independent of language/font glyph support.
+                g.fill(bx + 3, by + 7, bx + 6, by + 10, 0xFF102C26);
+                g.fill(bx + 6, by + 9, bx + 9, by + 12, 0xFF102C26);
+                g.fill(bx + 9, by + 6, bx + 12, by + 9, 0xFF102C26);
+                g.fill(bx + 10, by + 4, bx + 13, by + 7, 0xFF102C26);
+            }
+            String label = ui.caption().substring(4);
+            g.drawString(font, cut(label, Math.max(4, (w - 39) / 6)),
+                    x + 31, y + (h - 8) / 2, WHITE);
+        } else {
+            g.drawCenteredString(font, cut(ui.caption(), Math.max(4, (w - 10) / 6)),
+                    x + w / 2, y + (h - 8) / 2, fg);
+        }
+    }
+
+    @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
+        // Fixed chrome and tab headers do not scroll.
         line(g, "M", px + 16, py + 18, TEAL);
         line(g, "MACRO STUDIO", px + side + 15, py + 16, WHITE);
-        line(g, "MAX 2.2  /  1.21.11", px + side + 15, py + 29, GREY);
+        line(g, "MAX 2.3  /  MC 1.21.11", px + side + 15, py + 29, GREY);
         line(g, Recorder.active ? "REC" : Digger.active ? (Digger.isPaused() ? "PAUSED" : "MINING") : "READY",
-                px + pw - 110, py + 19, Recorder.active ? RED : Digger.active ? TEAL : GREY);
-        line(g, "v2.2.0", px + 15, py + ph - 20, GREY);
-        drawPage(g);
-        // Custom skinned clickable widgets (native buttons are visually transparent).
+                px + pw - 108, py + 19, Recorder.active ? RED : Digger.active ? TEAL : GREY);
+        line(g, "v2.3.0", px + 15, py + ph - 20, GREY);
+        line(g, NAV[tab.ordinal()] + "  /  SETTINGS", cx + 10, cy + 8, TEAL);
+        if (tab == Tab.MINING) {
+            line(g, cut(Digger.status(), Math.max(12, cw / 7)), cx + 12, cy + 64,
+                    Digger.active ? TEAL : GREY);
+            g.fill(cx + 12, cy + 80, cx + 22, cy + 88, RED);
+            line(g, "MINE", cx + 27, cy + 79, WHITE);
+            g.fill(cx + 89, cy + 80, cx + 99, cy + 88, 0xFF2CCB84);
+            line(g, "WALK", cx + 104, cy + 79, WHITE);
+            line(g, "0 = 3D SELECT", cx + Math.min(185, cw - 94), cy + 79, GOLD);
+        }
+
+        // Draw all page graphics within the panel. Scissor clips both text and cards,
+        // transform scrolls them at the same rate as the actual clickable widgets.
+        if (scrollTop < scrollBottom) {
+            g.enableScissor(cx + 4, scrollTop, cx + cw - 8, scrollBottom);
+            g.pose().pushMatrix();
+            g.pose().translate(0.0f, (float) -scrollPx);
+            drawPage(g);
+            g.pose().popMatrix();
+            g.disableScissor();
+        }
         for (UiButton ui : paintedButtons) {
-            Button b = ui.button();
-            int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
-            boolean hot = b.isHoveredOrFocused();
-            int bg = switch (ui.tone()) {
-                case PRIMARY -> hot ? 0xFF78FFDA : 0xFF35B7A6;
-                case DANGER -> hot ? 0xFFFF8498 : 0xFF8B354D;
-                case SELECTED -> hot ? 0xFF41677B : 0xFF2A5066;
-                case MUTED -> hot ? 0xFF34445E : 0xFF202C40;
-                case NORMAL -> hot ? 0xFF38526A : 0xFF29384D;
-            };
-            rounded(g, x, y, w, h, hot ? 0xFF9AD5DE : BORDER);
-            rounded(g, x + 1, y + 1, w - 2, h - 2, bg);
-            if (ui.tone() == Tone.SELECTED) g.fill(x + 1, y + 3, x + 3, y + h - 3, TEAL);
-            int fg = (ui.tone() == Tone.PRIMARY && hot) ? 0xFF10262D : WHITE;
-            g.drawCenteredString(font, cut(ui.caption(), Math.max(4, (w - 10) / 6)), x + w / 2, y + (h - 8) / 2, fg);
+            if (ui.content()) {
+                g.enableScissor(cx + 4, scrollTop, cx + cw - 8, scrollBottom);
+                paintButton(g, ui);
+                g.disableScissor();
+            } else paintButton(g, ui);
+        }
+
+        // Always-visible scroll track; thumb indicates how much content remains.
+        if (scrollMax > 0 && scrollBottom > scrollTop) {
+            int trackX = cx + cw - 8;
+            int trackH = scrollBottom - scrollTop;
+            int thumbH = Math.max(18, trackH * trackH / (trackH + scrollMax));
+            int thumbY = scrollTop + (trackH - thumbH) * scrollPx / scrollMax;
+            g.fill(trackX, scrollTop, trackX + 3, scrollBottom, 0xFF1F2D40);
+            g.fill(trackX, thumbY, trackX + 3, thumbY + thumbH, 0xFF5EDCC1);
         }
     }
 }

@@ -20,6 +20,7 @@ public class MacroStudioMod implements ClientModInitializer {
 		ClientSendMessageEvents.CHAT.register(Recorder::onChat);
 		ClientTickEvents.START_CLIENT_TICK.register(MacroStudioMod::tick);
 		Hud.init();
+		Selection3D.init();
 	}
 
 	private static void tick(Minecraft mc) {
@@ -27,7 +28,7 @@ public class MacroStudioMod implements ClientModInitializer {
             worldAnnounced = false;
         } else if (!worldAnnounced) {
             worldAnnounced = true;
-            Recorder.msg("Macro Studio MAX 2.2.0 загружен — Right Ctrl открывает меню");
+            Recorder.msg("Macro Studio MAX 2.3.0 загружен — Right Ctrl открывает меню");
         }
 		Set<Integer> down = Keys.pollDown();
 		Set<Integer> pressed = new HashSet<>(down);
@@ -46,6 +47,7 @@ public class MacroStudioMod implements ClientModInitializer {
 		AutoRefill.tick(mc);
 		AutoEat.tick(mc);
 		ShulkerPreview.tick(mc);
+		Selection3D.tick(mc);
 		Digger.tick(mc);
 		Deposit.tick(mc);
 		Extras.tick(mc, down);
@@ -57,6 +59,10 @@ public class MacroStudioMod implements ClientModInitializer {
 
 	private static void handlePress(Minecraft mc, int code) {
 		Settings s = Settings.I;
+		if (code == s.selectKey) {
+            Selection3D.toggle();
+            return;
+        }
 		if (code == s.openKey) {
 			mc.setScreen(new MacroStudioScreen());
 			return;
