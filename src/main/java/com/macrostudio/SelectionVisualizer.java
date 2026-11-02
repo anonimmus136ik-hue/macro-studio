@@ -16,11 +16,11 @@ import net.minecraft.world.phys.Vec3;
  * not a claim about what a particular server-side custom item will break.
  */
 public final class SelectionVisualizer {
-    private static final int EMERALD = 0xFF42E8B8;
+    private static final int EMERALD = 0xFF36E4AD;
     private static final int GOLD = 0xFFE6BF80;
     private static final int AMBER = 0xFFF5A44D;
     private static final int BLUE = 0xFF73A9FF;
-    private static final int RED = 0xFFF07583;
+    private static final int RED = 0xFFF36879;
 
     private static long lastRouteTime = -1;
     private static java.util.List<BlockPos> routeCache = java.util.List.of();
@@ -30,7 +30,7 @@ public final class SelectionVisualizer {
     public static void tick(Minecraft mc) {
         if (mc == null || mc.player == null || mc.level == null || mc.options.hideGui) return;
         Settings s = Settings.I;
-        if (!s.selectionVisuals && !s.drillPreview && !s.showRoute && !s.buildPreview) return;
+        if (!s.overlayEnabled || (!s.selectionVisuals && !s.drillPreview && !s.showRoute && !s.buildPreview)) return;
 
         try (Gizmos.TemporaryCollection ignored = mc.collectPerTickGizmos()) {
             if (s.selectionVisuals) selection(mc, s);
@@ -40,39 +40,72 @@ public final class SelectionVisualizer {
         }
     }
 
+    /** Red is material designated for removal; green is safe walking ground. */
     private static void selection(Minecraft mc, Settings s) {
         int[] a = s.dig1, b = s.dig2;
         if (a == null || b == null || a.length < 3 || b.length < 3) return;
-
         int minX = Math.min(a[0], b[0]), maxX = Math.max(a[0], b[0]);
         int minZ = Math.min(a[2], b[2]), maxZ = Math.max(a[2], b[2]);
         int originY = s.digUp ? Math.min(a[1], b[1]) : Math.max(a[1], b[1]);
-        int d = Math.max(1, Math.min(32, s.digDepth));
-        int minY = s.digUp ? originY : originY - d + 1;
-        int maxY = s.digUp ? originY + d - 1 : originY;
-
-        // Keep large remote selections from consuming render time.
+        int depth = Math.max(1, Math.min(8, s.digDepth));
+        int minY = s.digUp ? originY : originY - depth + 1;
+        int maxY = s.digUp ? originY + depth - 1 : originY;
+        int range = Math.max(8, Math.min(48, s.overlayRenderRange));
         double midX = (minX + maxX + 1) * 0.5, midZ = (minZ + maxZ + 1) * 0.5;
         if (mc.player.distanceToSqr(midX, mc.player.getY(), midZ) > 128.0 * 128.0) return;
 
+        int opacity = Math.max(10, Math.min(75, s.overlayOpacity));
+        int fillRed = (opacity << 24) | 0xF36879;
+        int fillGreen = ((opacity * 3 / 4) << 24) | 0x36E4AD;
         Gizmos.cuboid(new AABB(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1),
-                GizmoStyle.strokeAndFill(EMERALD, 2.5f, 0x1342E8B8));
-
+                GizmoStyle.strokeAndFill(RED, 2.2f, fillRed));
         if (s.showActiveLayer) {
             int y = Digger.active && Digger.currentTarget() != null
                     ? Digger.currentTarget().getY() : originY;
             y = Math.max(minY, Math.min(maxY, y));
             Gizmos.cuboid(new AABB(minX, y, minZ, maxX + 1, y + 1, maxZ + 1),
-                    GizmoStyle.strokeAndFill(BLUE, 2f, 0x1973A9FF));
+                    GizmoStyle.stroke(AMBER, 2.0f));
         }
 
+        int aroundX = mc.player.blockPosition().getX();
+        int aroundZ = mc.player.blockPosition().getZ();
+        int xmin = Math.max(minX, aroundX - range), xmax = Math.min(maxX, aroundX + range);
+        int zmin = Math.max(minZ, aroundZ - range), zmax = Math.min(maxZ, aroundZ + range);
+        int count = 0;
+        // Cap to 240 cells to keep 3D overlays usable on weak GPUs.
+        if (s.showDemolitionCells) {
+            for (int y = minY; y <= maxY && count < 240; y++)
+                for (int z = zmin; z <= zmax && count < 240; z++)
+                    for (int x = xmin; x <= xmax && count < 240; x++) {
+                        if ((x - aroundX) * (x - aroundX) + (z - aroundZ) * (z - aroundZ) > range * range)
+                            continue;
+                        BlockPos p = new BlockPos(x, y, z);
+                        // This is the player's chosen excavation volume, not an ore scanner.
+                        if (!mc.level.hasChunkAt(p) || mc.level.getBlockState(p).isAir()) continue;
+                        Gizmos.cuboid(p, GizmoStyle.stroke(RED, 1.0f));
+                        count++;
+                    }
+        }
+        // Safe places to stand, using only loaded ground, not a projected path through holes.
+        if (s.showWalkableCells) {
+            int feetY = mc.player.blockPosition().getY();
+            int walked = 0;
+            for (int z = zmin; z <= zmax && walked < 140; z++)
+                for (int x = xmin; x <= xmax && walked < 140; x++) {
+                    if ((x - aroundX) * (x - aroundX) + (z - aroundZ) * (z - aroundZ) > range * range)
+                        continue;
+                    BlockPos feet = new BlockPos(x, feetY, z);
+                    if (!SmartPath.walkable(mc, feet)) continue;
+                    Gizmos.cuboid(new AABB(x + .06, feetY - .04, z + .06, x + .94, feetY + .03, z + .94),
+                            GizmoStyle.strokeAndFill(EMERALD, 1.2f, fillGreen));
+                    walked++;
+                }
+        }
         Gizmos.cuboid(new BlockPos(a[0], a[1], a[2]), GizmoStyle.stroke(GOLD, 3f));
-        Gizmos.cuboid(new BlockPos(b[0], b[1], b[2]), GizmoStyle.stroke(AMBER, 3f));
-        if (Digger.currentTarget() != null && Digger.active) {
-            Gizmos.cuboid(Digger.currentTarget(), GizmoStyle.stroke(RED, 3f));
-        }
+        Gizmos.cuboid(new BlockPos(b[0], b[1], b[2]), GizmoStyle.stroke(GOLD, 3f));
+        if (Digger.active && Digger.currentTarget() != null)
+            Gizmos.cuboid(Digger.currentTarget(), GizmoStyle.stroke(0xFFFF4057, 3.5f));
     }
-
 
     private static void route(Minecraft mc, Settings s) {
         if (s.dig2 == null || s.dig2.length < 3) return;
@@ -86,7 +119,7 @@ public final class SelectionVisualizer {
         for (int i = 1; i < routeCache.size() && i < 96; i++) {
             BlockPos prev = routeCache.get(i - 1), next = routeCache.get(i);
             Gizmos.line(Vec3.atCenterOf(prev).add(0, -0.30, 0),
-                    Vec3.atCenterOf(next).add(0, -0.30, 0), BLUE, 3f);
+                    Vec3.atCenterOf(next).add(0, -0.30, 0), EMERALD, 3f);
         }
     }
 
