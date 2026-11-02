@@ -27,7 +27,7 @@ public class MacroStudioMod implements ClientModInitializer {
             worldAnnounced = false;
         } else if (!worldAnnounced) {
             worldAnnounced = true;
-            Recorder.msg("Macro Studio MAX 2.2.0 загружен — Right Ctrl открывает меню");
+            Recorder.msg("Macro Studio MAX 2.4.0 Obsidian Edition загружен — Right Ctrl открывает меню");
         }
 		Set<Integer> down = Keys.pollDown();
 		Set<Integer> pressed = new HashSet<>(down);
@@ -47,6 +47,7 @@ public class MacroStudioMod implements ClientModInitializer {
 		AutoEat.tick(mc);
 		ShulkerPreview.tick(mc);
 		Digger.tick(mc);
+        SelectionVisualizer.tick(mc);
 		Deposit.tick(mc);
 		Extras.tick(mc, down);
 		Optimize.tick(mc);
@@ -57,7 +58,15 @@ public class MacroStudioMod implements ClientModInitializer {
 
 	private static void handlePress(Minecraft mc, int code) {
 		Settings s = Settings.I;
-		if (code == s.openKey) {
+		if (code == s.overlayKey) {
+            s.overlayEnabled = !s.overlayEnabled;
+            Settings.save();
+            Recorder.msg(s.overlayEnabled
+                    ? "3D selection ON - green walking / red demolition"
+                    : "3D selection OFF");
+            return;
+        }
+        if (code == s.openKey) {
 			mc.setScreen(new MacroStudioScreen());
 			return;
 		}
@@ -66,9 +75,9 @@ public class MacroStudioMod implements ClientModInitializer {
 				Recorder.stop();
 				s.recordArmed = false;
 				Settings.save();
-			} else if (s.recordArmed) {
-				Recorder.start();
-			}
+			} else {
+                Recorder.start();
+            }
 			return;
 		}
 		if (code == s.stopKey) {

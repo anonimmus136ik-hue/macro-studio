@@ -47,7 +47,14 @@ public final class Hud {
 				}
 			}
 		}
-		if (s.hudWaypoints) {
+		if (s.resourceHud) {
+            lines.add("ORE FILTER  /  INVENTORY");
+            for (int i = 0; i < ResourceCatalog.NAMES.length; i++) {
+                if (ResourceCatalog.selected(i))
+                    lines.add(ResourceCatalog.NAMES[i] + ": " + ResourceCatalog.count(mc, i));
+            }
+        }
+        if (s.hudWaypoints) {
 			for (Settings.Waypoint w : s.waypoints) {
 				double dx = w.x + 0.5 - mc.player.getX();
 				double dy = w.y - mc.player.getY();

@@ -46,6 +46,9 @@ public final class Digger {
     private static boolean manualPause = false;
     private static Vec3 lastWalkPosition;
     private static int noMovementTicks;
+    private static SmartPath.Result routeCache;
+    private static int routeForIndex = -1;
+    private static long routeAtTick = -1;
     private static String status = "Готов к запуску";
     private static String lastError = "";
 
@@ -140,15 +143,18 @@ public final class Digger {
         int maxX = Math.max(a[0], b[0]);
         int minZ = Math.min(a[2], b[2]);
         int maxZ = Math.max(a[2], b[2]);
-        referenceY = Math.max(a[1], b[1]);
+        referenceY = Settings.I.digUp ? Math.min(a[1], b[1]) : Math.max(a[1], b[1]);
         depth = Mth.clamp(Settings.I.digDepth, 1, 8);
         path.clear();
-        int row = 0;
-        for (int z = minZ; z <= maxZ; z++, row++) {
-            if (row % 2 == 0) {
-                for (int x = minX; x <= maxX; x++) path.add(new int[] {x, z});
-            } else {
-                for (int x = maxX; x >= minX; x--) path.add(new int[] {x, z});
+        for (int layer = 0; layer < depth; layer++) {
+            int y = referenceY + (Settings.I.digUp ? layer : -layer);
+            int row = 0;
+            for (int z = minZ; z <= maxZ; z++, row++) {
+                if (row % 2 == 0) {
+                    for (int x = minX; x <= maxX; x++) path.add(new int[] {x, z, y});
+                } else {
+                    for (int x = maxX; x >= minX; x--) path.add(new int[] {x, z, y});
+                }
             }
         }
         topCache.clear();
@@ -158,11 +164,14 @@ public final class Digger {
         targetTicks = 0;
         noMovementTicks = 0;
         lastWalkPosition = mc.player.position();
+        routeCache = null;
+        routeForIndex = -1;
+        routeAtTick = -1;
         paused = false;
         manualPause = false;
         active = true;
         lastError = "";
-        status = "Запущено: " + path.size() + " колонок";
+        status = "Послойное копание: " + path.size() + " блоков";
         Recorder.msg("Копатель запущен. STOP — в меню");
     }
 
@@ -186,6 +195,8 @@ public final class Digger {
         targetTicks = 0;
         noMovementTicks = 0;
         lastWalkPosition = null;
+        routeCache = null;
+        routeForIndex = -1;
         releaseKeys(Minecraft.getInstance());
         status = "Остановлен пользователем";
         Recorder.msg("Копатель остановлен");
@@ -224,20 +235,9 @@ public final class Digger {
         return state.blocksMotion() && !state.is(BlockTags.LEAVES);
     }
 
+    /** Target level is fixed by the selection, not by unrelated surface blocks. */
     private static int surface(Minecraft mc, int i) {
-        Integer cached = topCache.get(i);
-        if (cached != null) return cached;
-        int[] cell = path.get(i);
-        int result = MISSING;
-        for (int y = referenceY + 3; y >= referenceY - 8; y--) {
-            BlockState state = mc.level.getBlockState(new BlockPos(cell[0], y, cell[1]));
-            if (safeFloor(state)) {
-                result = y;
-                break;
-            }
-        }
-        topCache.put(i, result);
-        return result;
+        return path.get(i)[2];
     }
 
     private static boolean underPlayer(Minecraft mc, int x, int z) {
@@ -246,23 +246,15 @@ public final class Digger {
                 && z >= Math.floor(pz - 0.45) && z <= Math.floor(pz + 0.45);
     }
 
+    /** Only the current cell is considered. No scanning ten cells backwards. */
     private static BlockPos findTarget(Minecraft mc) {
-        Vec3 eye = mc.player.getEyePosition();
-        int from = Math.max(0, index - 10);
-        int to = Math.min(index, path.size() - 1);
-        for (int i = from; i <= to; i++) {
-            int top = surface(mc, i);
-            if (top == MISSING) continue;
-            int[] col = path.get(i);
-            if (underPlayer(mc, col[0], col[1])) continue;
-            for (int y = top; y > top - depth; y--) {
-                BlockPos pos = new BlockPos(col[0], y, col[1]);
-                if (skipped.contains(pos) || mc.level.getBlockState(pos).isAir()) continue;
-                Vec3 center = Vec3.atCenterOf(pos);
-                if (eye.distanceTo(center) <= REACH && unobstructed(mc, pos)) return pos;
-            }
-        }
-        return null;
+        if (index >= path.size()) return null;
+        int[] cell = path.get(index);
+        BlockPos pos = new BlockPos(cell[0], cell[2], cell[1]);
+        if (Settings.I.mineSelectedOnly && !ResourceCatalog.matchesSelectedBlock(mc.level.getBlockState(pos))) return null;
+        if (skipped.contains(pos) || mc.level.getBlockState(pos).isAir()) return null;
+        if (underPlayer(mc, cell[0], cell[1]) && pos.getY() <= mc.player.blockPosition().getY()) return null;
+        return mc.player.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) <= REACH && unobstructed(mc, pos) ? pos : null;
     }
 
     private static boolean unobstructed(Minecraft mc, BlockPos pos) {
@@ -329,7 +321,7 @@ public final class Digger {
         }
 
         int top = surface(mc, index);
-        if (top != MISSING && mc.player.getY() < top - 1.5) {
+        if (!Settings.I.digUp && top != MISSING && mc.player.getY() < top - 1.5) {
             halt("Падение относительно уровня земли — остановлено");
             return;
         }
@@ -337,12 +329,15 @@ public final class Digger {
         if (target != null && mc.level.getBlockState(target).isAir()) {
             target = null;
             targetTicks = 0;
+            index++;
+            if (index >= path.size()) { finish(); return; }
         }
         if (target == null) target = findTarget(mc);
         if (target != null) {
             mc.options.keyUp.setDown(false);
             mc.options.keyJump.setDown(false);
             mc.options.keySprint.setDown(false);
+            if (Settings.I.drillAssist) DrillAssist.select(mc, target);
             boolean aligned = aim(mc, target);
             boolean hit = aligned && unobstructed(mc, target) && actualAimHits(mc, target);
             mc.options.keyAttack.setDown(hit);
@@ -350,35 +345,62 @@ public final class Digger {
             if (++targetTicks > MAX_TARGET_TICKS) {
                 mc.options.keyAttack.setDown(false);
                 skipped.add(target);
+                lastError = "Timeout: " + target.toShortString();
                 target = null;
                 targetTicks = 0;
+                index++;
             }
             return;
         }
         mc.options.keyAttack.setDown(false);
 
         int[] cell = path.get(index);
-        double dx = cell[0] + .5 - mc.player.getX();
-        double dz = cell[1] + .5 - mc.player.getZ();
-        double distance = Math.hypot(dx, dz);
-        if (distance < 0.34) {
+        BlockPos currentBlock = new BlockPos(cell[0], cell[2], cell[1]);
+        if (Settings.I.mineSelectedOnly
+                && !ResourceCatalog.matchesSelectedBlock(mc.level.getBlockState(currentBlock))) {
+            // Non-selected material is never mined or included as a visible target.
+            index++;
             releaseKeys(mc);
-            int next = index + 1;
-            int gap = 0;
-            while (next < path.size() && surface(mc, next) == MISSING) {
-                gap++;
-                next++;
-            }
-            if (next >= path.size()) {
-                finish();
-                return;
-            }
-            if (gap >= 3) {
-                halt("Большая пропасть впереди — остановлено");
-                return;
-            }
-            index = next;
-            status = "Перехожу к колонке " + (index + 1) + " из " + path.size();
+            return;
+        }
+        if (mc.level.getBlockState(currentBlock).isAir() || skipped.contains(currentBlock)) {
+            index++;
+            releaseKeys(mc);
+            return;
+        }
+        // A* searches only known, safely walkable ground and avoids one-block holes.
+        long worldTime = mc.level.getGameTime();
+        if (routeCache == null || routeForIndex != index || routeAtTick < 0
+                || worldTime < routeAtTick || worldTime - routeAtTick > 12) {
+            routeCache = SmartPath.toMiningColumn(mc, currentBlock);
+            routeForIndex = index;
+            routeAtTick = worldTime;
+        }
+        SmartPath.Result route = routeCache;
+        if (!route.found()) {
+            halt("Нет безопасного обхода к блоку " + currentBlock.toShortString());
+            return;
+        }
+        List<BlockPos> nodes = route.path();
+        BlockPos stand = nodes.get(nodes.size() - 1);
+        double standDistance = Math.hypot(stand.getX() + .5 - mc.player.getX(),
+                stand.getZ() + .5 - mc.player.getZ());
+        if (standDistance < 0.4 && nodes.size() <= 1) {
+            halt("Блок недоступен с текущей позиции: " + currentBlock.toShortString());
+            return;
+        }
+        BlockPos step = nodes.size() > 1 ? nodes.get(1) : stand;
+        double dx = step.getX() + .5 - mc.player.getX();
+        double dz = step.getZ() + .5 - mc.player.getZ();
+        double distance = Math.hypot(dx, dz);
+        if (distance < 0.30) {
+            routeCache = null; // Waypoint reached: replan from the new position.
+            releaseKeys(mc);
+            return;
+        }
+        if (!SmartPath.walkable(mc, step)) {
+            routeCache = null;
+            releaseKeys(mc);
             return;
         }
 
@@ -407,6 +429,6 @@ public final class Digger {
         mc.options.keyUp.setDown(facing);
         mc.options.keyJump.setDown(facing && mc.player.horizontalCollision);
         mc.options.keySprint.setDown(false);
-        status = "Двигаюсь к колонке " + (index + 1);
+        status = "A* маршрут к блоку " + (index + 1) + "/" + path.size();
     }
 }

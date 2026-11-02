@@ -20,37 +20,42 @@ import java.util.function.Consumer;
  * mouse handling. The visible skin is custom-rendered.
  */
 public final class MacroStudioScreen extends Screen {
-    private enum Tab { HOME, MINING, AUTO, MACROS, BINDS, DEPOSIT, VISUAL, PERF, SETTINGS }
+    private enum Tab { HOME, MINING, ROUTE, BUILD, MARKET, AUTO, MACROS, BINDS, DEPOSIT, VISUAL, PERF, SETTINGS }
     private enum Tone { NORMAL, PRIMARY, DANGER, MUTED, SELECTED }
 
-    private static final int BG = 0xFF090D16;
-    private static final int PANEL = 0xFF131D2C;
-    private static final int CARD = 0xFF1B283B;
-    private static final int BORDER = 0xFF2C3D51;
+    private static final int BG = 0xFF090E15;
+    private static final int PANEL = 0xFF121C27;
+    private static final int CARD = 0xFF182533;
+    private static final int BORDER = 0xFF2A4550;
     private static final int WHITE = 0xFFEAF5FF;
     private static final int GREY = 0xFF93A6BE;
-    private static final int TEAL = 0xFF58E2C5;
+    private static final int TEAL = 0xFF69E8BF;
     private static final int PURPLE = 0xFF9A8AFF;
     private static final int RED = 0xFFFF7184;
-    private static final int GOLD = 0xFFFFCE83;
+    private static final int GOLD = 0xFFD8BA80;
+    private static final int BLUE = 0xFF80AFFF;
 
-    private static final String[] NAV = {"HOME", "MINING", "AUTOMATION", "MACROS", "BINDS", "DEPOSIT", "VISUAL", "PERFORMANCE", "SETTINGS"};
+    private static final String[] NAV = {"DASHBOARD", "MINING STUDIO", "SMART ROUTE", "BUILD STUDIO", "MARKET / ORES", "AUTOMATION", "MACROS", "BINDS", "DEPOSIT", "VISUAL", "PERFORMANCE", "SETTINGS"};
     private final List<UiButton> paintedButtons = new ArrayList<>();
     private Tab tab = Tab.MINING;
     private String selectedMacro;
     private String rename = "";
     private int macroPage = 0;
     private int bindsPage = 0;
-    private int visualPage = 0;
+    private int navPage = 0;
+    private int visualPage = 2;
+    private int scrollOffset = 0;
+    private int contentBottomRaw = 0;
+    private int maxScroll = 0;
     private String captureId;
     private Consumer<Integer> capture;
     private int px, py, pw, ph, side, cx, cy, cw, ch, rowStep;
     private int[] lookedPos;
 
-    private record UiButton(Button button, String caption, Tone tone) {}
+    private record UiButton(Button button, String caption, Tone tone, boolean content) {}
 
     public MacroStudioScreen() {
-        super(Component.literal("Macro Studio MAX 2.2.0"));
+        super(Component.literal("Macro Studio | Obsidian Edition"));
         Minecraft mc = Minecraft.getInstance();
         if (mc.hitResult instanceof BlockHitResult hit && mc.hitResult.getType() == HitResult.Type.BLOCK) {
             lookedPos = new int[] {hit.getBlockPos().getX(), hit.getBlockPos().getY(), hit.getBlockPos().getZ()};
@@ -69,7 +74,7 @@ public final class MacroStudioScreen extends Screen {
 
     private static void rounded(GuiGraphics g, int x, int y, int w, int h, int color) {
         if (w <= 0 || h <= 0) return;
-        int r = Math.min(4, Math.min(w, h) / 3);
+        int r = Math.min(7, Math.min(w, h) / 3);
         g.fill(x + r, y, x + w - r, y + h, color);
         g.fill(x, y + r, x + w, y + h - r, color);
         g.fill(x + 1, y + 1, x + w - 1, y + h - 1, color);
@@ -86,13 +91,27 @@ public final class MacroStudioScreen extends Screen {
     }
 
     private Button button(String caption, int x, int y, int w, int h, Tone tone, Button.OnPress action) {
-        Button b = Button.builder(Component.literal(caption), action).bounds(x, y, w, h).build();
-        // Native button still receives mouse, keyboard and narration input.
-        // Custom paint is drawn after the standard widget render.
-        b.setAlpha(0.0f);
-        addRenderableWidget(b);
-        paintedButtons.add(new UiButton(b, caption, tone));
-        return b;
+        boolean content = x >= cx && y >= cy && x < cx + cw;
+        if (content) {
+            contentBottomRaw = Math.max(contentBottomRaw, y + h + 8);
+            y -= scrollOffset;
+        }
+        Button widget = Button.builder(Component.literal(caption), action)
+                .bounds(x, y, Math.max(16,w), Math.max(14,h)).build();
+        widget.setAlpha(0.0f);
+        if (content) widget.visible = y >= cy + 2 && y + h <= cy + ch - 5;
+        addRenderableWidget(widget);
+        paintedButtons.add(new UiButton(widget, caption, tone, content));
+        return widget;
+    }
+
+    /** Text fields scroll with the same viewport as all other controls. */
+    private void addField(EditBox field) {
+        int rawY = field.getY();
+        contentBottomRaw = Math.max(contentBottomRaw, rawY + field.getHeight() + 8);
+        field.setY(rawY - scrollOffset);
+        field.visible = field.getY() >= cy + 2 && field.getY() + field.getHeight() <= cy + ch - 5;
+        addRenderableWidget(field);
     }
 
     private void callAndRefresh(Runnable r) {
@@ -104,27 +123,44 @@ public final class MacroStudioScreen extends Screen {
     private void build() {
         clearWidgets();
         paintedButtons.clear();
-        pw = Math.max(280, Math.min(width - 12, 920));
-        ph = Math.max(210, Math.min(height - 10, 528));
+        contentBottomRaw = 0;
+        pw = Math.min(Math.max(150, width - 8), Math.max(150, Math.min(1100, width * Settings.I.uiWidthPercent / 100)));
+        ph = Math.min(Math.max(130, height - 8), Math.max(130, Math.min(680, height * Settings.I.uiHeightPercent / 100)));
         px = (width - pw) / 2;
         py = (height - ph) / 2;
-        side = Math.min(139, Math.max(102, pw / 5));
+        side = Math.min(142, Math.max(78, pw / 5));
         cx = px + side + 13;
         cy = py + 62;
         cw = px + pw - 11 - cx;
         ch = ph - 74;
-        rowStep = Math.max(18, Math.min(30, (ph - 107) / NAV.length));
+        rowStep = Math.max(14, Math.min(30, (ph - 101) / NAV.length));
 
-        for (int i = 0; i < NAV.length; i++) {
+        int navRows = Math.min(NAV.length, Math.max(3, (ph - 120) / 22));
+        navPage = Math.max(0, Math.min(navPage, (NAV.length - 1) / navRows));
+        int navStart = navPage * navRows;
+        int tabHeight = Math.min(27, Math.max(16, (ph - 124) / navRows - 2));
+        int tabStep = tabHeight + 3;
+        for (int local = 0; local < navRows && navStart + local < NAV.length; local++) {
+            int i = navStart + local;
             final Tab t = Tab.values()[i];
-            button(NAV[i], px + 8, py + 68 + i * rowStep, side - 16,
-                    Math.min(26, rowStep - 2), tab == t ? Tone.SELECTED : Tone.MUTED,
-                    b -> { tab = t; build(); });
+            button(NAV[i], px + 8, py + 67 + local * tabStep, side - 16,
+                    tabHeight, tab == t ? Tone.SELECTED : Tone.MUTED,
+                    b -> { tab = t; scrollOffset = 0; build(); });
+        }
+        if (NAV.length > navRows) {
+            button("<", px + 8, py + ph - 52, Math.max(28, (side-22)/2), 23, Tone.MUTED,
+                    b -> { navPage = Math.max(0, navPage-1); build(); });
+            button(">", px + 11 + Math.max(28, (side-22)/2), py + ph - 52,
+                    Math.max(28, (side-22)/2), 23, Tone.MUTED,
+                    b -> { navPage = Math.min((NAV.length-1)/navRows,navPage+1); build(); });
         }
         button("X", px + pw - 34, py + 13, 22, 22, Tone.DANGER, b -> onClose());
         switch (tab) {
             case HOME -> home();
             case MINING -> mining();
+            case ROUTE -> routePanel();
+            case BUILD -> buildPanel();
+            case MARKET -> marketPanel();
             case AUTO -> automation();
             case MACROS -> macros();
             case BINDS -> binds();
@@ -132,6 +168,22 @@ public final class MacroStudioScreen extends Screen {
             case VISUAL -> visuals();
             case PERF -> performance();
             case SETTINGS -> settings();
+        }
+        int suggestedBottom = cy + switch (tab) {
+            case ROUTE -> 440;
+            case MARKET -> 375;
+            case MINING -> 370;
+            case AUTO -> 355;
+            case SETTINGS -> 365;
+            case VISUAL -> (visualPage == 2 ? 570 : 400);
+            case DEPOSIT -> 400;
+            default -> 320;
+        };
+        contentBottomRaw = Math.max(contentBottomRaw, suggestedBottom);
+        maxScroll = Math.max(0, contentBottomRaw - (cy + ch - 5));
+        if (scrollOffset > maxScroll) {
+            scrollOffset = maxScroll;
+            build();
         }
     }
 
@@ -194,10 +246,106 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(() -> Settings.I.digTurnSpeed = Math.max(2, Settings.I.digTurnSpeed - 1)));
         button("TURN +", x + half + 5, y + 211, half, 23, Tone.MUTED,
                 b -> callAndRefresh(() -> Settings.I.digTurnSpeed = Math.min(20, Settings.I.digTurnSpeed + 1)));
-        if (y + 266 < cy + ch) {
+        {
             button("CLEAR SELECTION", x, y + 244, w, 23, Tone.DANGER,
                     b -> callAndRefresh(Digger::clearSelection));
         }
+    }
+
+    private void routePanel() {
+        Settings s = Settings.I;
+        int x = cx + 12, y = cy + 41, w = Math.max(90, Math.min(340, cw - 24));
+        button(toggle("3D SELECTION OUTLINE", s.selectionVisuals), x, y, w, 26, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.selectionVisuals = !s.selectionVisuals));
+        button(toggle("ACTIVE LAYER", s.showActiveLayer), x, y + 33, w, 26, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.showActiveLayer = !s.showActiveLayer));
+        button(toggle("DRILL 3x3x2 PREVIEW", s.drillPreview), x, y + 66, w, 26, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.drillPreview = !s.drillPreview));
+        button(toggle("SAFE ROUTE LINES", s.showRoute), x, y + 99, w, 26, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.showRoute = !s.showRoute));
+        button("MINE " + (s.digUp ? "UP" : "DOWN") + "  [SWITCH]", x, y + 132, w, 27, Tone.SELECTED,
+                b -> callAndRefresh(() -> s.digUp = !s.digUp));
+        int half = Math.max(44, (w - 6) / 2);
+        button("X -", x, y + 204, half, 24, Tone.MUTED, b -> resizeAxis(0, -1));
+        button("X +", x + half + 6, y + 204, half, 24, Tone.MUTED, b -> resizeAxis(0, 1));
+        button("Z -", x, y + 233, half, 24, Tone.MUTED, b -> resizeAxis(2, -1));
+        button("Z +", x + half + 6, y + 233, half, 24, Tone.MUTED, b -> resizeAxis(2, 1));
+        {
+            button(toggle("DRILL TOOL ASSIST", s.drillAssist), x, y + 266, w, 24,
+                    Tone.NORMAL, b -> callAndRefresh(() -> s.drillAssist = !s.drillAssist));
+            button("SAVE HELD AS DRILL", x, y + 295, w, 24, Tone.MUTED,
+                    b -> callAndRefresh(() -> DrillAssist.captureHeld(Minecraft.getInstance())));
+            button("SET LOOKED BLOCK TYPE", x, y + 324, w, 24, Tone.MUTED,
+                    b -> callAndRefresh(() -> DrillAssist.captureBlock(Minecraft.getInstance(), lookedPos)));
+        }
+    }
+
+    private void resizeAxis(int axis, int delta) {
+        if (Digger.active || Settings.I.dig2 == null) {
+            Recorder.msg("Stop mining and set POS2 to resize");
+            return;
+        }
+        Settings.I.dig2[axis] += delta;
+        Settings.save();
+        build();
+    }
+
+    private void buildPanel() {
+        Settings s = Settings.I;
+        int x = cx + 12, y = cy + 44, w = Math.max(90, Math.min(340, cw - 24));
+        button(toggle("BUILD HOLOGRAM", s.buildPreview), x, y, w, 29, Tone.PRIMARY,
+                b -> callAndRefresh(() -> s.buildPreview = !s.buildPreview));
+        button("SHAPE: " + new String[]{"FLOOR", "WALLS", "FILL"}[s.buildMode % 3],
+                x, y + 38, w, 29, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.buildMode = (s.buildMode + 1) % 3));
+        button("OPEN SELECTION", x, y + 83, w, 27, Tone.NORMAL, b -> { tab = Tab.MINING; build(); });
+        button("EXPAND X", x, y + 127, w, 25, Tone.MUTED, b -> resizeAxis(0, 1));
+        button("EXPAND Z", x, y + 158, w, 25, Tone.MUTED, b -> resizeAxis(2, 1));
+    }
+
+    private void marketPanel() {
+        Settings s = Settings.I;
+        int x = cx + 12, y = cy + 38, w = Math.max(90, Math.min(380, cw - 24));
+        String[] ores = ResourceCatalog.NAMES;
+        int cellW = Math.max(62, (w - 8) / 2);
+        for (int i = 0; i < ores.length; i++) {
+            final int idx = i;
+            int row = i / 2, col = i % 2;
+            button((s.resourceFilter[i] ? "[x] " : "[ ] ") + ores[i] + " " + ResourceCatalog.count(Minecraft.getInstance(),i), x + col * (cellW + 8), y + row * 31,
+                    cellW, 25, s.resourceFilter[i] ? Tone.SELECTED : Tone.MUTED,
+                    b -> callAndRefresh(() -> s.resourceFilter[idx] = !s.resourceFilter[idx]));
+        }
+        button("PRICE - 50", x, y + 155, cellW, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.marketPrice = Math.max(1, s.marketPrice - 50)));
+        button("PRICE + 50", x + cellW + 8, y + 155, cellW, 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.marketPrice = Math.min(100000000, s.marketPrice + 50)));
+        button(toggle("INVENTORY ORE HUD", s.resourceHud), x, y + 250, w, 25, Tone.NORMAL,
+                b -> callAndRefresh(() -> s.resourceHud = !s.resourceHud));
+        {
+            button(toggle("MINE SELECTED ORES ONLY", s.mineSelectedOnly), x, y + 280, w, 25,
+                    Tone.NORMAL, b -> callAndRefresh(() -> s.mineSelectedOnly = !s.mineSelectedOnly));
+        }
+        EditBox price = new EditBox(font, x, y + 187, w, 18, Component.literal("Exact sale price"));
+        price.setMaxLength(9);
+        price.setValue(String.valueOf(s.marketPrice));
+        price.setResponder(value -> {
+            try {
+                int entered = Integer.parseInt(value);
+                if (entered > 0 && entered <= 100000000) s.marketPrice = entered;
+            } catch (NumberFormatException ignored) {
+                // Keep last valid value while the user is editing.
+            }
+        });
+        addField(price);
+        button("COPY VERIFIED SALE COMMAND", x, y + 213, w, 30, Tone.PRIMARY, b -> {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null || !ResourceCatalog.eligibleForMarket(mc.player.getMainHandItem())) {
+                Recorder.msg("Hold 64 allowed items from your selected resource filter");
+                return;
+            }
+            mc.keyboardHandler.setClipboard("/market sell " + s.marketPrice);
+            Recorder.msg("Command copied. Check price and confirm sale manually.");
+        });
     }
 
     private void automation() {
@@ -262,14 +410,14 @@ public final class MacroStudioScreen extends Screen {
             e.setMaxLength(32);
             e.setValue(rename.isEmpty() ? chosen : rename);
             e.setResponder(v -> rename = v);
-            addRenderableWidget(e);
+            addField(e);
             button("RENAME", rx, y + 187, rw, 23, Tone.MUTED, b -> {
                 String n = Macros.sanitize(rename.isEmpty() ? chosen : rename);
                 if (!n.isEmpty() && Macros.rename(chosen, n)) selectedMacro = n;
                 rename = "";
                 build();
             });
-            if (ch > 310) button("DELETE MACRO", rx, y + 217, rw, 24, Tone.DANGER,
+            button("DELETE MACRO", rx, y + 217, rw, 24, Tone.DANGER,
                     b -> { Macros.delete(chosen); selectedMacro = null; build(); });
         }
     }
@@ -290,7 +438,7 @@ public final class MacroStudioScreen extends Screen {
             box.setMaxLength(200);
             box.setValue(bd.lines == null ? "" : bd.lines);
             box.setResponder(v -> bd.lines = v);
-            addRenderableWidget(box);
+            addField(box);
             button("X", cx + cw - 39, yy, 24, 24, Tone.DANGER,
                     b -> callAndRefresh(() -> s.binds.remove(bd)));
         }
@@ -317,10 +465,10 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(s.chests::clear));
         EditBox before = new EditBox(font, x, y + 98, w, 20, Component.literal("Command when full"));
         before.setMaxLength(200); before.setValue(s.fullCmd); before.setResponder(v -> s.fullCmd = v);
-        addRenderableWidget(before);
+        addField(before);
         EditBox after = new EditBox(font, x, y + 151, w, 20, Component.literal("Return command"));
         after.setMaxLength(200); after.setValue(s.backCmd); after.setResponder(v -> s.backCmd = v);
-        addRenderableWidget(after);
+        addField(after);
         int gridWidth = Math.min(w, 9 * 24);
         int gap = gridWidth / 9;
         for (int row = 0; row < 4; row++) for (int col = 0; col < 9; col++) {
@@ -335,36 +483,42 @@ public final class MacroStudioScreen extends Screen {
 
     private void visuals() {
         Settings s = Settings.I;
-        int x = cx + 12, y = cy + 36;
-        int w = Math.min(cw - 24, 345);
-        button("WORLD", x, y, Math.max(60, (w - 8) / 2), 25,
-                visualPage == 0 ? Tone.SELECTED : Tone.MUTED, b -> { visualPage = 0; build(); });
-        button("HUD / PREVIEW", x + (w - 8) / 2 + 8, y, Math.max(60, (w - 8) / 2), 25,
-                visualPage == 1 ? Tone.SELECTED : Tone.MUTED, b -> { visualPage = 1; build(); });
-        int yy = y + 39;
+        int x = cx + 12, y = cy + 40;
+        int w = Math.max(55, Math.min(cw - 24, 410));
+        int col = Math.max(20, (w - 12) / 4);
+        String[] tabs = {"WORLD", "HUD", "3D / PLAN", "WINDOW"};
+        for (int i = 0; i < 4; i++) {
+            final int page = i;
+            button(tabs[i], x + i * (col + 4), y, col, 27,
+                    visualPage == i ? Tone.SELECTED : Tone.MUTED,
+                    press -> { visualPage = page; scrollOffset = 0; build(); });
+        }
+        int yy = y + 46;
         if (visualPage == 0) {
-            button(toggle("FULLBRIGHT", s.brightMax), x, yy, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.brightMax = !s.brightMax));
-            button(toggle("HIDE RAIN (LOCAL)", s.noRain), x, yy + 33, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.noRain = !s.noRain));
-            button("TIME: " + Extras.TIME_NAMES[s.timeMode], x, yy + 66, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.timeMode = (s.timeMode + 1) % Extras.TIME_NAMES.length));
-            button(toggle("AUTO SPRINT", s.autoSprint), x, yy + 99, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.autoSprint = !s.autoSprint));
-            button(toggle("CRITICAL SOUND", s.critSound), x, yy + 132, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.critSound = !s.critSound));
-            button(keyLabel("zoom", "ZOOM KEY: ", s.zoomKey), x, yy + 165, w, 26, Tone.MUTED,
-                    b -> capture("zoom", code -> s.zoomKey = code));
-        } else {
-            button(toggle("SHULKER PREVIEW", s.shulkerPreview), x, yy, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.shulkerPreview = !s.shulkerPreview));
-            button(toggle("COORDINATES HUD", s.hudCoords), x, yy + 33, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.hudCoords = !s.hudCoords));
-            button(toggle("ARMOR DURABILITY", s.hudArmor), x, yy + 66, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.hudArmor = !s.hudArmor));
-            button(toggle("WAYPOINT HUD", s.hudWaypoints), x, yy + 99, w, 26, Tone.NORMAL,
-                    b -> callAndRefresh(() -> s.hudWaypoints = !s.hudWaypoints));
-            button("ADD WAYPOINT HERE", x, yy + 132, w, 26, Tone.NORMAL, b -> callAndRefresh(() -> {
+            button(toggle("FULLBRIGHT", s.brightMax), x, yy, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.brightMax = !s.brightMax));
+            button(toggle("HIDE RAIN (LOCAL)", s.noRain), x, yy + 37, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.noRain = !s.noRain));
+            button("TIME: " + Extras.TIME_NAMES[s.timeMode], x, yy + 74, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.timeMode = (s.timeMode + 1) % Extras.TIME_NAMES.length));
+            button(toggle("AUTO SPRINT", s.autoSprint), x, yy + 111, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.autoSprint = !s.autoSprint));
+            button(toggle("CRITICAL SOUND", s.critSound), x, yy + 148, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.critSound = !s.critSound));
+            button(keyLabel("zoom", "ZOOM KEY: ", s.zoomKey), x, yy + 185, w, 29, Tone.MUTED,
+                    press -> capture("zoom", code -> s.zoomKey = code));
+        } else if (visualPage == 1) {
+            button(toggle("SHULKER PREVIEW", s.shulkerPreview), x, yy, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.shulkerPreview = !s.shulkerPreview));
+            button(toggle("COORDINATES", s.hudCoords), x, yy + 37, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.hudCoords = !s.hudCoords));
+            button(toggle("ARMOR DURABILITY", s.hudArmor), x, yy + 74, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.hudArmor = !s.hudArmor));
+            button(toggle("WAYPOINTS", s.hudWaypoints), x, yy + 111, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.hudWaypoints = !s.hudWaypoints));
+            button(toggle("RESOURCE COUNTER", s.resourceHud), x, yy + 148, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.resourceHud = !s.resourceHud));
+            button("ADD WAYPOINT HERE", x, yy + 196, w, 29, Tone.PRIMARY, press -> callAndRefresh(() -> {
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.player != null) {
                     Settings.Waypoint point = new Settings.Waypoint();
@@ -375,8 +529,48 @@ public final class MacroStudioScreen extends Screen {
                     s.waypoints.add(point);
                 }
             }));
-            button("CLEAR WAYPOINTS (" + s.waypoints.size() + ")", x, yy + 165, w, 26, Tone.DANGER,
-                    b -> callAndRefresh(s.waypoints::clear));
+            button("CLEAR WAYPOINTS (" + s.waypoints.size() + ")", x, yy + 233, w, 29, Tone.DANGER,
+                    press -> callAndRefresh(s.waypoints::clear));
+        } else if (visualPage == 2) {
+            button(toggle("MASTER 3D OVERLAY [0]", s.overlayEnabled), x, yy, w, 29, Tone.PRIMARY,
+                    press -> callAndRefresh(() -> s.overlayEnabled = !s.overlayEnabled));
+            button(toggle("GREEN SAFE WALKING", s.showWalkableCells), x, yy + 37, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.showWalkableCells = !s.showWalkableCells));
+            button(toggle("RED MINING VOLUME", s.showDemolitionCells), x, yy + 74, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.showDemolitionCells = !s.showDemolitionCells));
+            button(toggle("SELECTION WIREFRAME", s.selectionVisuals), x, yy + 111, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.selectionVisuals = !s.selectionVisuals));
+            button(toggle("ACTIVE LAYER", s.showActiveLayer), x, yy + 148, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.showActiveLayer = !s.showActiveLayer));
+            button(toggle("GREEN A* ROUTE", s.showRoute), x, yy + 185, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.showRoute = !s.showRoute));
+            button(toggle("DRILL 3x3x2", s.drillPreview), x, yy + 222, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.drillPreview = !s.drillPreview));
+            button(toggle("BUILD PREVIEW", s.buildPreview), x, yy + 259, w, 29, Tone.NORMAL,
+                    press -> callAndRefresh(() -> s.buildPreview = !s.buildPreview));
+            int half = Math.max(25, (w - 6)/2);
+            button("OPACITY -", x, yy + 319, half, 28, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.overlayOpacity = Math.max(10, s.overlayOpacity - 5)));
+            button("OPACITY +", x + half + 6, yy + 319, half, 28, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.overlayOpacity = Math.min(75, s.overlayOpacity + 5)));
+            button("RANGE -", x, yy + 383, half, 28, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.overlayRenderRange = Math.max(8, s.overlayRenderRange - 4)));
+            button("RANGE +", x + half + 6, yy + 383, half, 28, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.overlayRenderRange = Math.min(48, s.overlayRenderRange + 4)));
+        } else {
+            int half = Math.max(25, (w - 6)/2);
+            button("WIDTH -", x, yy, half, 29, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.uiWidthPercent = Math.max(55, s.uiWidthPercent - 5)));
+            button("WIDTH +", x + half + 6, yy, half, 29, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.uiWidthPercent = Math.min(96, s.uiWidthPercent + 5)));
+            button("HEIGHT -", x, yy + 70, half, 29, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.uiHeightPercent = Math.max(65, s.uiHeightPercent - 5)));
+            button("HEIGHT +", x + half + 6, yy + 70, half, 29, Tone.MUTED,
+                    press -> callAndRefresh(() -> s.uiHeightPercent = Math.min(97, s.uiHeightPercent + 5)));
+            button(keyLabel("overlay", "OVERLAY KEY: ", s.overlayKey), x, yy + 139, w, 29, Tone.NORMAL,
+                    press -> capture("overlay", code -> s.overlayKey = code < 0 ? 48 : code));
+            button("SAVE ALL SETTINGS", x, yy + 184, w, 29, Tone.PRIMARY,
+                    press -> { Settings.save(); Recorder.msg("Visual settings saved"); });
         }
     }
 
@@ -416,7 +610,16 @@ public final class MacroStudioScreen extends Screen {
                 b -> callAndRefresh(() -> s.hpHearts = Math.max(1, s.hpHearts - 1)));
         button("HEALTH +", x + (w - 8) / 2 + 8, y + 151, Math.max(60, (w - 8) / 2), 26, Tone.MUTED,
                 b -> callAndRefresh(() -> s.hpHearts = Math.min(9, s.hpHearts + 1)));
-        button("SAVE SETTINGS", x, y + 199, w, 26, Tone.PRIMARY, b -> { Settings.save(); Recorder.msg("Настройки сохранены"); });
+        button("WINDOW WIDTH -", x, y + 199, Math.max(60,(w-8)/2), 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.uiWidthPercent = Math.max(55,s.uiWidthPercent-5)));
+        button("WINDOW WIDTH +", x + (w-8)/2 + 8, y + 199, Math.max(60,(w-8)/2), 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.uiWidthPercent = Math.min(96,s.uiWidthPercent+5)));
+        button("WINDOW HEIGHT -", x, y + 231, Math.max(60,(w-8)/2), 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.uiHeightPercent = Math.max(65,s.uiHeightPercent-5)));
+        button("WINDOW HEIGHT +", x + (w-8)/2 + 8, y + 231, Math.max(60,(w-8)/2), 26, Tone.MUTED,
+                b -> callAndRefresh(() -> s.uiHeightPercent = Math.min(97,s.uiHeightPercent+5)));
+        button("SAVE SETTINGS", x, y + 264, w, 26, Tone.PRIMARY,
+                b -> { Settings.save(); Recorder.msg("Settings saved"); });
     }
 
     private String keyLabel(String id, String prefix, int key) {
@@ -455,12 +658,33 @@ public final class MacroStudioScreen extends Screen {
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+        if (mouseX >= cx && mouseX <= cx + cw && mouseY >= cy && mouseY <= cy + ch) {
+            int next = Math.max(0, Math.min(maxScroll, scrollOffset - (int) Math.round(vertical * 29)));
+            if (next != scrollOffset) {
+                scrollOffset = next;
+                build();
+            }
+            return true;
+        }
+        if (mouseX >= px + 4 && mouseX < px + side && mouseY >= py + 46 && mouseY < py + ph - 43) {
+            int navRows = Math.min(NAV.length, Math.max(3, (ph - 120) / 22));
+            int maxPage = (NAV.length - 1) / navRows;
+            navPage = Math.max(0, Math.min(maxPage, navPage - (int) Math.signum(vertical)));
+            build();
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
+    }
+
+    @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         g.fill(0, 0, width, height, 0xE0060A12);
         rounded(g, px - 2, py - 2, pw + 4, ph + 4, 0xFF33475D);
         rounded(g, px, py, pw, ph, BG);
         rounded(g, px + 4, py + 4, side - 2, ph - 8, PANEL);
-        g.fillGradient(px + side + 2, py + 45, px + pw - 3, py + 47, TEAL, PURPLE);
+        g.fillGradient(px + side + 2, py + 46, px + pw - 3, py + 48, GOLD, TEAL);
+        g.fill(px + 8, py + ph - 34, px + side - 3, py + ph - 33, 0xFF3E4D53);
         rounded(g, cx, cy, cw, ch, PANEL);
         g.fill(cx, cy, cx + cw, cy + 2, 0xFF273F55);
         if (tab == Tab.MINING) {
@@ -500,7 +724,7 @@ public final class MacroStudioScreen extends Screen {
                 line(g, "REPLAY: " + (Replayer.active ? "ACTIVE" : "IDLE"), x, y + 245, GREY);
             }
             case MINING -> {
-                line(g, "MINING STUDIO  /  ACTIVE CONTROLS", x, y, TEAL);
+                line(g, "MINING STUDIO  /  SELECT & PREVIEW", x, y, TEAL);
                 int ly = cy + 30;
                 int leftW = miningLeftWidth();
                 line(g, "POINT 1 / " + cut(point(Settings.I.dig1), Math.max(12, leftW / 6)), x, ly + 61, WHITE);
@@ -527,6 +751,24 @@ public final class MacroStudioScreen extends Screen {
                     line(g, cut(Digger.lastError(), Math.max(30, cw / 6)), x, cy + ch - 18, RED);
                 }
             }
+            case ROUTE -> {
+                line(g, "SMART ROUTE  /  3D GIZMOS", x, y, TEAL);
+                line(g, "Overlay: native Minecraft lines, no X-Ray.", x, y + 25, GREY);
+                line(g, "Route: safe horizontal A* / avoid gaps.", x, y + 162, GREY);
+                line(g, "Mining direction: " + (Settings.I.digUp ? "UP" : "DOWN"), x, y + 183, GOLD);
+                line(g, "Drill ID: " + cut(Settings.I.drillItemId, Math.max(10,cw/7)), x, y + 198, GREY);
+            }
+            case BUILD -> {
+                line(g, "BUILD STUDIO  /  HOLOGRAM", x, y, BLUE);
+                line(g, "Preview only: no block placement packets.", x, y + 27, GREY);
+                line(g, "Mode: " + new String[]{"FLOOR","WALLS","FILL"}[Settings.I.buildMode % 3], x, y + 108, GOLD);
+            }
+            case MARKET -> {
+                line(g, "RESOURCE FILTER  /  MARKET ASSISTANT", x, y, TEAL);
+                line(g, "Only loaded inventory items; no ore ESP.", x, y + 22, GREY);
+                line(g, "Price: " + Settings.I.marketPrice + "  |  Exact price below.", x, y + 188, GOLD);
+                line(g, "Hold 64 items; confirm in chat manually.", x, y + 285, GREY);
+            }
             case AUTO -> {
                 line(g, "AUTOMATION / INSTALLED MODULES", x, y, TEAL);
                 line(g, "Food threshold: " + Settings.I.eatBelow + " / 20", x, y + 149, GOLD);
@@ -545,8 +787,16 @@ public final class MacroStudioScreen extends Screen {
                 line(g, "K = keep    + = deposit", x, y + 243, GREY);
             }
             case VISUAL -> {
-                line(g, "VISUAL & HUD / REAL TOGGLES", x, y, TEAL);
-                line(g, "Client-side options only", x, y + 265, GREY);
+                line(g, "VISUAL ATELIER  /  CUSTOMIZATION", x, y, GOLD);
+                if (visualPage == 2) {
+                    line(g, "Red = blocks to clear  |  Green = safe floor", x, y + 298, WHITE);
+                    line(g, "Opacity: " + Settings.I.overlayOpacity + "%", x, y + 351, TEAL);
+                    line(g, "Render range: " + Settings.I.overlayRenderRange + " blocks", x, y + 414, TEAL);
+                } else if (visualPage == 3) {
+                    line(g, "Width: " + Settings.I.uiWidthPercent + "%", x, y + 89, TEAL);
+                    line(g, "Height: " + Settings.I.uiHeightPercent + "%", x, y + 159, TEAL);
+                    line(g, "Scroll with the mouse wheel to see all controls.", x, y + 255, GREY);
+                }
             }
             case PERF -> {
                 line(g, "PERFORMANCE / LIGHTWEIGHT RENDER", x, y, TEAL);
@@ -563,33 +813,78 @@ public final class MacroStudioScreen extends Screen {
         }
     }
 
+    private void paintButton(GuiGraphics g, UiButton ui) {
+        Button b = ui.button();
+        if (!b.visible) return;
+        int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
+        boolean hovered = b.isHoveredOrFocused();
+        String caption = ui.caption();
+        boolean on = caption.endsWith("[ON]");
+        boolean off = caption.endsWith("[OFF]");
+        boolean checkbox = on || off;
+        if (checkbox) {
+            // Table-like checkbox row, readable at narrow GUI scales.
+            rounded(g, x, y, w, h, hovered ? 0xFF4D6A70 : BORDER);
+            rounded(g, x + 1, y + 1, w - 2, h - 2, hovered ? 0xFF203C40 : CARD);
+            int size = Math.max(10, Math.min(16, h - 8));
+            rounded(g, x + 8, y + (h - size)/2, size, size,
+                    on ? TEAL : 0xFF425464);
+            rounded(g, x + 10, y + (h - size)/2 + 2, size - 4, size - 4,
+                    on ? 0xFF194A3D : PANEL);
+            if (on) g.drawCenteredString(font, "✓", x + 8 + size/2, y + (h - 8)/2, 0xFFFFFFFF);
+            String label = caption.substring(0, caption.lastIndexOf("   ["));
+            int maxChars = Math.max(3, (w - size - 30)/6);
+            g.drawString(font, cut(label,maxChars),x + size + 16,y + (h - 8)/2,WHITE);
+        } else {
+            int bg = switch (ui.tone()) {
+                case PRIMARY -> hovered ? 0xFF4EDFB1 : 0xFF167F65;
+                case DANGER -> hovered ? 0xFF9B4255 : 0xFF642D3E;
+                case SELECTED -> hovered ? 0xFF3D6562 : 0xFF254640;
+                case MUTED -> hovered ? 0xFF384959 : 0xFF263240;
+                case NORMAL -> hovered ? 0xFF314F55 : 0xFF1E323C;
+            };
+            rounded(g, x, y, w, h, hovered ? GOLD : BORDER);
+            rounded(g, x + 1, y + 1, w - 2, h - 2, bg);
+            if (ui.tone() == Tone.SELECTED)
+                g.fill(x + 2, y + 3, x + 4, y + h - 3, TEAL);
+            g.drawCenteredString(font,
+                    cut(caption,Math.max(4,(w - 13)/6)),
+                    x + w/2, y + (h - 8)/2, WHITE);
+        }
+    }
+
+    private void paintScrollbar(GuiGraphics g) {
+        if (maxScroll <= 0 || ch < 24) return;
+        int x = cx + cw - 7, y = cy + 7, h = ch - 14;
+        g.fill(x, y, x + 3, y + h, 0xFF1A2B33);
+        int thumb = Math.max(14, (int)((long) h * h / (h + maxScroll)));
+        int position = (h - thumb) * scrollOffset / Math.max(1,maxScroll);
+        rounded(g, x - 1, y + position, 5, thumb, TEAL);
+    }
+
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
-        line(g, "M", px + 16, py + 18, TEAL);
-        line(g, "MACRO STUDIO", px + side + 15, py + 16, WHITE);
-        line(g, "MAX 2.2  /  1.21.11", px + side + 15, py + 29, GREY);
+        // Permanent chrome never scrolls.
+        rounded(g, px + 11, py + 12, 23, 24, 0xFF29392F);
+        line(g, "M", px + 19, py + 20, GOLD);
+        line(g, "MACRO STUDIO  //  OBSIDIAN", px + side + 15, py + 16, WHITE);
+        line(g, "PREMIUM UI  /  1.21.11", px + side + 15, py + 29, GOLD);
         line(g, Recorder.active ? "REC" : Digger.active ? (Digger.isPaused() ? "PAUSED" : "MINING") : "READY",
                 px + pw - 110, py + 19, Recorder.active ? RED : Digger.active ? TEAL : GREY);
-        line(g, "v2.2.0", px + 15, py + ph - 20, GREY);
+        line(g, "v2.4.0  ·  0 = 3D", px + 11, py + ph - 19, GOLD);
+
+        // The world preview, header and selected page are clipped to the content viewport.
+        g.enableScissor(cx + 2, cy + 2, cx + cw - 3, cy + ch - 3);
+        g.pose().pushMatrix();
+        g.pose().translate(0f, -scrollOffset);
         drawPage(g);
-        // Custom skinned clickable widgets (native buttons are visually transparent).
-        for (UiButton ui : paintedButtons) {
-            Button b = ui.button();
-            int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
-            boolean hot = b.isHoveredOrFocused();
-            int bg = switch (ui.tone()) {
-                case PRIMARY -> hot ? 0xFF78FFDA : 0xFF35B7A6;
-                case DANGER -> hot ? 0xFFFF8498 : 0xFF8B354D;
-                case SELECTED -> hot ? 0xFF41677B : 0xFF2A5066;
-                case MUTED -> hot ? 0xFF34445E : 0xFF202C40;
-                case NORMAL -> hot ? 0xFF38526A : 0xFF29384D;
-            };
-            rounded(g, x, y, w, h, hot ? 0xFF9AD5DE : BORDER);
-            rounded(g, x + 1, y + 1, w - 2, h - 2, bg);
-            if (ui.tone() == Tone.SELECTED) g.fill(x + 1, y + 3, x + 3, y + h - 3, TEAL);
-            int fg = (ui.tone() == Tone.PRIMARY && hot) ? 0xFF10262D : WHITE;
-            g.drawCenteredString(font, cut(ui.caption(), Math.max(4, (w - 10) / 6)), x + w / 2, y + (h - 8) / 2, fg);
-        }
+        g.pose().popMatrix();
+        for (UiButton ui : paintedButtons) if (ui.content()) paintButton(g,ui);
+        g.disableScissor();
+
+        // Sidebar is fixed and independently paginated / wheel-scrollable.
+        for (UiButton ui : paintedButtons) if (!ui.content()) paintButton(g,ui);
+        paintScrollbar(g);
     }
 }

@@ -18,8 +18,8 @@ import java.util.Set;
 public final class Settings {
 	/** GLFW_KEY_RIGHT_CONTROL */
 	public int openKey = 345;
-	public int recordKey = -1;
-	public int stopKey = -1;
+	public int recordKey = 296; // GLFW F7
+	public int stopKey = 297; // GLFW F8
 	public boolean recordArmed = false;
 	public Map<String, Integer> macroKeys = new LinkedHashMap<>();
 	public List<Bind> binds = new ArrayList<>();
@@ -28,6 +28,34 @@ public final class Settings {
 	public int digDepth = 2;
 	/** Maximum camera turn in degrees per client tick. */
 	public int digTurnSpeed = 6;
+    /** Preview options: no automatic server interactions. */
+    /** GLFW 0 toggles the entire in-world blueprint overlay. */
+    public int overlayKey = 48;
+    public boolean overlayEnabled = true;
+    public boolean showWalkableCells = true;
+    public boolean showDemolitionCells = true;
+    public int overlayOpacity = 30;
+    public int overlayRenderRange = 20;
+    public boolean selectionVisuals = true;
+    public boolean showActiveLayer = true;
+    public boolean showRoute = false;
+    public boolean drillPreview = false;
+    public boolean drillAssist = false;
+    public String drillItemId = "";
+    public String drillItemName = "";
+    public String drillBlockId = "";
+    public boolean digUp = false;
+    /** Window percentage of available GUI width, not global Minecraft GUI scale. */
+    public int uiWidthPercent = 84;
+    public int uiHeightPercent = 90;
+    public boolean buildPreview = false;
+    /** 0 floor, 1 walls, 2 fill. Preview only. */
+    public int buildMode = 0;
+    public boolean resourceHud = false;
+    public boolean mineSelectedOnly = false;
+    public boolean marketAssistant = false;
+    public int marketPrice = 400;
+    public boolean[] resourceFilter = {true, true, true, true, true, true, true};
 	public boolean critSound = false;
 	public boolean[] keepSlots = defaultKeep();
 	public boolean noRain = false;
@@ -96,12 +124,27 @@ public final class Settings {
 			if (Files.exists(f)) {
 				Settings s = GSON.fromJson(Files.readString(f, StandardCharsets.UTF_8), Settings.class);
 				if (s != null) {
-					if (s.macroKeys == null) s.macroKeys = new LinkedHashMap<>();
+					// Migrate untouched 2.2 defaults while retaining customized keybinds.
+                    if (s.openKey == 345 && s.recordKey == -1 && s.stopKey == -1) {
+                        s.recordKey = 296;
+                        s.stopKey = 297;
+                    }
+                    if (s.macroKeys == null) s.macroKeys = new LinkedHashMap<>();
 					if (s.binds == null) s.binds = new ArrayList<>();
 					if (s.chests == null) s.chests = new ArrayList<>();
 					if (s.waypoints == null) s.waypoints = new ArrayList<>();
 					if (s.keepSlots == null || s.keepSlots.length != 36) s.keepSlots = defaultKeep();
-					if (s.fullCmd == null) s.fullCmd = "";
+                    if (s.resourceFilter == null || s.resourceFilter.length != 7) s.resourceFilter = new boolean[] {true,true,true,true,true,true,true};
+                    s.uiWidthPercent = Math.max(55, Math.min(96, s.uiWidthPercent));
+                    s.uiHeightPercent = Math.max(65, Math.min(97, s.uiHeightPercent));
+                    s.marketPrice = Math.max(1, Math.min(100000000, s.marketPrice));
+                    s.overlayOpacity = Math.max(10, Math.min(75, s.overlayOpacity));
+                    s.overlayRenderRange = Math.max(8, Math.min(48, s.overlayRenderRange));
+                    if (s.overlayKey <= 0) s.overlayKey = 48;
+					if (s.drillItemId == null) s.drillItemId = "";
+                    if (s.drillItemName == null) s.drillItemName = "";
+                    if (s.drillBlockId == null) s.drillBlockId = "";
+                    if (s.fullCmd == null) s.fullCmd = "";
 					if (s.backCmd == null) s.backCmd = "";
 					I = s;
 				}
@@ -127,6 +170,7 @@ public final class Settings {
 		r.add(I.recordKey);
 		r.add(I.stopKey);
 		r.add(I.zoomKey);
+        r.add(I.overlayKey);
 		r.addAll(I.macroKeys.values());
 		return r;
 	}

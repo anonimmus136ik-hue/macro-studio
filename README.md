@@ -1,25 +1,74 @@
-# Macro Studio MAX 2.2.0
+# Macro Studio MAX 2.4.0 — Obsidian Edition
 
-Client-side Fabric mod for Minecraft Java 1.21.11. This repo contains ONE current version as editable source. Old uploaded ZIP versions are removed from main.
+Fabric client-side mod for **Minecraft Java 1.21.11** (official Mojang mappings). This is the editable source, not a web mockup. The project still includes original MAX 2.2 macros, binds, assisted mining, auto tools, deposit, and HUD modules.
 
-## Install the real mod
+## How to build and install
 
-1. Open GitHub Actions in this repository.
-2. Open latest successful "Build Macro Studio MAX 2.2.0" on main.
-3. Download the "MacroStudio-MAX-2.2.0" artifact ZIP and extract it.
-4. Place ONLY macro-studio-2.2.0.jar into the active Minecraft instance's mods folder. Remove all previous macro-studio JARs from that same instance.
-5. Enter a world. The message "Macro Studio MAX 2.2.0 загружен" confirms the new version has loaded.
+1. Open **Actions → Build Macro Studio MAX 2.4.0** on GitHub.
+2. Download the latest **successful** `MacroStudio-MAX-2.4.0` artifact.
+3. Extract `macro-studio-2.4.0.jar` from that ZIP.
+4. Put the JAR into the Fabric 1.21.11 instance's `mods` directory. Install the matching Fabric API, and remove older Macro Studio JARs.
+5. **Right Ctrl** opens the in-game menu, **F7** toggles macro recording and **F8** stops automation (default mappings, rebindable under Settings). The text **Obsidian Edition** at the top identifies this version.
 
-Open the GUI with Right Ctrl. On MINING use POS1 LOOK / FEET, POS2 LOOK / FEET, then START, PAUSE / RESUME and STOP. LOOK uses the block captured when opening the menu.
+The Gradle wrapper uses Java 25 for Fabric Loom; the mod's class bytecode is Java 21.
 
-## Build
+## Premium UI / Visual Atelier (v2.4.0)
 
-Fabric Loom needs Java 25 to run Gradle. Compiled bytecode targets Java 21. Build using gradlew.bat build (Windows) or ./gradlew build (Linux).
+- **Checkbox tables**: true ON/OFF states with clickable, clearly labeled checkbox rows.
+- **Mouse wheel vertical scrolling** in each content page; viewport scissoring, only visible controls accept input, and a graphical scrollbar. Sidebar has independent wheel/page navigation. Settings are available even on low Minecraft GUI resolutions.
+- **Visual Atelier** contains 4 pages: World, HUD, 3D/Plan, Window. Each checkbox affects a real in-world renderer option.
+- **0 (zero)** toggles the entire world preview while Right Ctrl opens the configuration UI. Rebind 0 in Visual Atelier → Window.
+- **Red** selection volume and target boxes = proposed excavation. **Green** floor tiles and A* route = safe currently traversable positions. Adjust transparency (10-75) and drawing radius (8-48 blocks). The colored blueprint is not an ore-ESP.
+- **Real branded mod icon** embedded at `assets/macrostudio/icon.png`. Fabric Loader displays it using the `icon` entry in `fabric.mod.json`.
+- Credits in mod metadata are listed as `Macro Studio Contributors` and `anonimmus136ik-hue`, instead of the accidental generic icon / old assistant credit.
 
-## Implemented
+## Implemented in this branch
 
-Mining Studio with smooth camera turning, real reach/aim checks, selection, progress, pause; Recorder/Replayer, AutoTool, AutoRefill, AutoEat, AutoDeposit, Shulker Preview, HUD, keybinds and visual/performance settings.
+### Mining / 3D selection
+- Resizable territory using two points (POS1 and POS2); adjust X/Z in **Smart Route** and depth in **Mining Studio**.
+- Native Minecraft 1.21.11 Gizmos: transparent 3D selection volume, highlighted current layer, point A/B boxes, current mining target.
+- **Mine Up / Down** selection direction, with fixed Y layers in the digger queue.
+- **Drill 3×3×2 preview** renders the 18 estimated block cells in the direction of the clicked face. This is visual only, **not an integration with any private server-side drill**.\n- **Drill Tool Assist**: save the currently held custom tool ID and choose one matching block type by looking at a block before opening the GUI. If the block matches, the miner selects that drill; on other types it chooses an ordinary correct harvesting tool from the hotbar when available. The server still decides actual mined cells.
+- Mining no longer searches up to ten previously visited columns for old targets.
+- Bounded horizontal A* navigation avoids known floor holes on loaded terrain; on blocked paths, the miner stops with an explicit reason rather than stepping into the void. The world is not scanned through walls for ores.
+- Client movement still uses normal keys, camera turning and reach rules; no packet spoofing or anti-cheat bypass.
 
-Not implemented: AutoFish, AutoFarm, AutoBuild, A* pathfinding and 3D in-world selection.
+### Build Studio
+- Hologram-only preview of a floor, perimeter walls or fill volume using selected points.
+- **No automatic block placement** is implemented in this version.
 
-A successful CI build confirms compilation, not successful use in Minecraft. Historical Git commits and old Actions logs remain accessible.
+### Market & resources
+- Resource selection and **real inventory totals** for diamonds, emeralds, gold, iron, redstone, coal and stone including raw/ingot/ore variants from loaded inventory.
+- Optional inventory resource counter HUD.
+- Optional **MINE SELECTED ORES ONLY** restricts Mining Studio targets to the chosen block classes in the selected area. Disabled by default; it is not a vein miner, path-to-hidden-ore finder or full auto-farm.
+- Price controls and **manual copy** of `/market sell PRICE`, only while holding a complete stack of 64 eligible, selected resource items (not tools or other valuables). The player checks the price and submits the chat command themselves.
+- No automatic selling, teleporting to warps, X-Ray, container manipulation or server-side market API integration.
+
+### Obsidian UI
+- Dark slate, emerald and muted gold accents.
+- Dashboard, Mining Studio, Smart Route, Build Studio, Market/Ores, Automation, Macros, Binds, Deposit, Visual, Performance and Settings.
+- Width and height customization, accessible pagination for smaller GUI resolutions, responsive native buttons.
+- Preserves **Right Ctrl** as the default menu shortcut.
+
+## Limitations and safety
+
+The A* walker only considers **horizontal, currently loaded and walkable surfaces**, with solid floor and enough headroom. It intentionally does not bridge, fly, jump holes, teleport or mine inaccessible targets. Upward mining needs a stable reachable position (scaffolding is not created). Verify any server's rules before enabling automation. Some multiplayer servers prohibit mining bots and automatic market listings.
+
+Save custom drill with **Smart Route → SAVE HELD AS DRILL** and choose a matching block type using **SET LOOKED BLOCK TYPE**, then enable **DRILL TOOL ASSIST**. These settings identify a tool; they do not discover private server recipes or synchronize proprietary 3×3×2 effects.\n\nThe drill footprint visualization does **not** establish which server-specific blocks a custom drill will break; that requires knowing the drill's actual item behavior and testing on a server that allows automation. This is not a compatibility claim for ReallyWorld's proprietary mechanics.
+
+**A green GitHub build confirms compilation only.** Test the rendered outlines, Digger route safety, settings layout and Minecraft startup in an actual world before calling the mod production ready.
+
+## Manual QA checklist
+
+- [ ] Right Ctrl opens and closes the UI at multiple GUI scales; scroll wheel reaches every control, no visual overflow
+- [ ] Press 0 to toggle 3D preview, check green safe floor vs red proposed excavation volume, opacity/radius settings
+- [ ] Fabric Mods list shows custom emblem and updated contributor metadata
+- [ ] POS1 / POS2, Smart Route X/Z resize and Mine Up/Down show correct bounds
+- [ ] 3D selection and Active Layer appear in-world
+- [ ] Drill 3x3x2 preview updates in all 6 face directions
+- [ ] A* route avoids a hole; no route stops safely
+- [ ] Mining progresses through one Y level at a time without stepping on air
+- [ ] Build Studio Floor / Walls / Fill shows only holograms
+- [ ] Market/Ores counts match the 36 inventory slots
+- [ ] Full stack is required before copy; no command is sent automatically
+- [ ] Stop all releases movement and attack keys
