@@ -129,7 +129,7 @@ public final class Digger {
         else Settings.I.dig2 = point;
         Settings.I.digHeightPoint = null;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level != null) Settings.I.digDimension = mc.level.dimension().location().toString();
+        if (mc.level != null) Settings.I.digDimension = mc.level.dimension().identifier().toString();
         status = "Выбрана точка " + which;
         Settings.save();
         Recorder.msg("Точка " + which + ": " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ());
@@ -153,7 +153,7 @@ public final class Digger {
             fail("Слишком большая область (максимум 16384 колонок и 65536 блоков)");
             return;
         }
-        String dim = mc.level.dimension().location().toString();
+        String dim = mc.level.dimension().identifier().toString();
         if (Settings.I.digDimension != null && !Settings.I.digDimension.isEmpty()
                 && !dim.equals(Settings.I.digDimension)) {
             fail("Область выбрана в другом измерении. Нажми 0 и выбери снова");
