@@ -29,6 +29,13 @@ public final class Settings {
 	/** Maximum camera turn in degrees per client tick. */
 	public int digTurnSpeed = 6;
     /** Preview options: no automatic server interactions. */
+    /** GLFW 0 toggles the entire in-world blueprint overlay. */
+    public int overlayKey = 48;
+    public boolean overlayEnabled = true;
+    public boolean showWalkableCells = true;
+    public boolean showDemolitionCells = true;
+    public int overlayOpacity = 30;
+    public int overlayRenderRange = 20;
     public boolean selectionVisuals = true;
     public boolean showActiveLayer = true;
     public boolean showRoute = false;
@@ -131,6 +138,9 @@ public final class Settings {
                     s.uiWidthPercent = Math.max(55, Math.min(96, s.uiWidthPercent));
                     s.uiHeightPercent = Math.max(65, Math.min(97, s.uiHeightPercent));
                     s.marketPrice = Math.max(1, Math.min(100000000, s.marketPrice));
+                    s.overlayOpacity = Math.max(10, Math.min(75, s.overlayOpacity));
+                    s.overlayRenderRange = Math.max(8, Math.min(48, s.overlayRenderRange));
+                    if (s.overlayKey <= 0) s.overlayKey = 48;
 					if (s.drillItemId == null) s.drillItemId = "";
                     if (s.drillItemName == null) s.drillItemName = "";
                     if (s.drillBlockId == null) s.drillBlockId = "";
@@ -160,6 +170,7 @@ public final class Settings {
 		r.add(I.recordKey);
 		r.add(I.stopKey);
 		r.add(I.zoomKey);
+        r.add(I.overlayKey);
 		r.addAll(I.macroKeys.values());
 		return r;
 	}
