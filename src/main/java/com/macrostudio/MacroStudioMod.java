@@ -58,7 +58,15 @@ public class MacroStudioMod implements ClientModInitializer {
 
 	private static void handlePress(Minecraft mc, int code) {
 		Settings s = Settings.I;
-		if (code == s.openKey) {
+		if (code == s.overlayKey) {
+            s.overlayEnabled = !s.overlayEnabled;
+            Settings.save();
+            Recorder.msg(s.overlayEnabled
+                    ? "3D selection ON - green walking / red demolition"
+                    : "3D selection OFF");
+            return;
+        }
+        if (code == s.openKey) {
 			mc.setScreen(new MacroStudioScreen());
 			return;
 		}
