@@ -91,7 +91,7 @@ public final class Selection3D {
             s.dig1 = new int[] {p.getX(), p.getY(), p.getZ()};
             s.dig2 = null;
             s.digHeightPoint = null;
-            s.digDimension = mc.level.dimension().location().toString();
+            s.digDimension = mc.level.dimension().identifier().toString();
             phase = 2;
             inform("Первая точка: " + coords(p) + ". ПКМ: противоположный угол на земле");
         } else if (phase == 2) {
@@ -175,7 +175,7 @@ public final class Selection3D {
         long width = (long) maxX - minX + 1, length = (long) maxZ - minZ + 1;
         if (width > 128 || length > 128 || (highY - lowY) > 48) return;
 
-        Vec3 camera = mc.gameRenderer.getMainCamera().getPosition();
+        Vec3 camera = mc.gameRenderer.getMainCamera().position();
         Matrix4f pose = ctx.matrices().last().pose();
         VertexConsumer v = ctx.consumers().getBuffer(RenderTypes.lines());
 
@@ -241,9 +241,9 @@ public final class Selection3D {
         float d=(float)Math.sqrt(dx*dx+dy*dy+dz*dz);
         if(d<0.00001f) return;
         float nx=dx/d, ny=dy/d, nz=dz/d;
-        v.vertex(pose,(float)(x1-camera.x),(float)(y1-camera.y),(float)(z1-camera.z))
+        v.vertex((float)(x1-camera.x),(float)(y1-camera.y),(float)(z1-camera.z))
                 .color(r,g,b,a).normal(nx,ny,nz).lineWidth(1.7f);
-        v.vertex(pose,(float)(x2-camera.x),(float)(y2-camera.y),(float)(z2-camera.z))
+        v.vertex((float)(x2-camera.x),(float)(y2-camera.y),(float)(z2-camera.z))
                 .color(r,g,b,a).normal(nx,ny,nz).lineWidth(1.7f);
     }
 }
