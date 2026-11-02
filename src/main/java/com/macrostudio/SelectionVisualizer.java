@@ -81,7 +81,7 @@ public final class SelectionVisualizer {
             lastRouteTime = gameTime;
             BlockPos dest = Digger.currentTarget() == null
                     ? new BlockPos(s.dig2[0], s.dig2[1], s.dig2[2]) : Digger.currentTarget();
-            routeCache = SmartPath.toMiningColumn(mc, dest.getX(), dest.getZ()).path();
+            routeCache = SmartPath.toMiningColumn(mc, dest).path();
         }
         for (int i = 1; i < routeCache.size() && i < 96; i++) {
             BlockPos prev = routeCache.get(i - 1), next = routeCache.get(i);
