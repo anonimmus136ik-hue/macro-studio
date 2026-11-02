@@ -30,10 +30,11 @@ public final class SelectionVisualizer {
     public static void tick(Minecraft mc) {
         if (mc == null || mc.player == null || mc.level == null || mc.options.hideGui) return;
         Settings s = Settings.I;
-        if (!s.overlayEnabled || (!s.selectionVisuals && !s.drillPreview && !s.showRoute && !s.buildPreview)) return;
+        if (!s.overlayEnabled || (!s.selectionVisuals && !s.showWalkableCells && !s.showDemolitionCells
+                && !s.showActiveLayer && !s.drillPreview && !s.showRoute && !s.buildPreview)) return;
 
         try (Gizmos.TemporaryCollection ignored = mc.collectPerTickGizmos()) {
-            if (s.selectionVisuals) selection(mc, s);
+            if (s.selectionVisuals || s.showWalkableCells || s.showDemolitionCells || s.showActiveLayer) selection(mc, s);
             if (s.drillPreview) drill(mc);
             if (s.showRoute) route(mc, s);
             if (s.buildPreview) build(mc, s);
@@ -57,8 +58,10 @@ public final class SelectionVisualizer {
         int opacity = Math.max(10, Math.min(75, s.overlayOpacity));
         int fillRed = (opacity << 24) | 0xF36879;
         int fillGreen = ((opacity * 3 / 4) << 24) | 0x36E4AD;
-        Gizmos.cuboid(new AABB(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1),
+        if (s.selectionVisuals) {
+            Gizmos.cuboid(new AABB(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1),
                 GizmoStyle.strokeAndFill(RED, 2.2f, fillRed));
+        }
         if (s.showActiveLayer) {
             int y = Digger.active && Digger.currentTarget() != null
                     ? Digger.currentTarget().getY() : originY;
