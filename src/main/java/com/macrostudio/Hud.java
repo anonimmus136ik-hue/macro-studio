@@ -33,6 +33,17 @@ public final class Hud {
 		Minecraft mc = Minecraft.getInstance();
 		Settings s = Settings.I;
 		if (mc.player == null || mc.options.hideGui) return;
+        if (s.digHud) {
+            String progress = Selection3D.hudText();
+            if (!progress.isEmpty()) {
+                int maxText = Math.max(12, Math.min(95, (mc.getWindow().getGuiScaledWidth() - 18) / 6));
+                if (progress.length() > maxText) progress = progress.substring(0, maxText - 2) + "..";
+                int w = mc.font.width(progress) + 16;
+                g.fill(5, 5, 5 + w, 26, 0xD6111D2C);
+                g.fill(5, 5, 8, 26, Selection3D.selecting() ? 0xFF4EEDAA : 0xFFFB7285);
+                g.drawString(mc.font, progress, 13, 12, 0xFFFFFFFF);
+            }
+        }
 		List<String> lines = new ArrayList<>();
 		if (s.hudCoords) {
 			lines.add(String.format("XYZ %d %d %d  %s", (int) Math.floor(mc.player.getX()), (int) Math.floor(mc.player.getY()),
