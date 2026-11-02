@@ -46,6 +46,9 @@ public final class Digger {
     private static boolean manualPause = false;
     private static Vec3 lastWalkPosition;
     private static int noMovementTicks;
+    private static SmartPath.Result routeCache;
+    private static int routeForIndex = -1;
+    private static long routeAtTick = -1;
     private static String status = "Готов к запуску";
     private static String lastError = "";
 
@@ -161,6 +164,9 @@ public final class Digger {
         targetTicks = 0;
         noMovementTicks = 0;
         lastWalkPosition = mc.player.position();
+        routeCache = null;
+        routeForIndex = -1;
+        routeAtTick = -1;
         paused = false;
         manualPause = false;
         active = true;
@@ -189,6 +195,8 @@ public final class Digger {
         targetTicks = 0;
         noMovementTicks = 0;
         lastWalkPosition = null;
+        routeCache = null;
+        routeForIndex = -1;
         releaseKeys(Minecraft.getInstance());
         status = "Остановлен пользователем";
         Recorder.msg("Копатель остановлен");
@@ -351,7 +359,14 @@ public final class Digger {
             return;
         }
         // A* searches only known, safely walkable ground and avoids one-block holes.
-        SmartPath.Result route = SmartPath.toMiningColumn(mc, cell[0], cell[1]);
+        long worldTime = mc.level.getGameTime();
+        if (routeCache == null || routeForIndex != index || routeAtTick < 0
+                || worldTime < routeAtTick || worldTime - routeAtTick > 12) {
+            routeCache = SmartPath.toMiningColumn(mc, cell[0], cell[1]);
+            routeForIndex = index;
+            routeAtTick = worldTime;
+        }
+        SmartPath.Result route = routeCache;
         if (!route.found()) {
             halt("Нет безопасного обхода к блоку " + currentBlock.toShortString());
             return;
@@ -368,7 +383,13 @@ public final class Digger {
         double dx = step.getX() + .5 - mc.player.getX();
         double dz = step.getZ() + .5 - mc.player.getZ();
         double distance = Math.hypot(dx, dz);
-        if (distance < 0.25) {
+        if (distance < 0.30) {
+            routeCache = null; // Waypoint reached: replan from the new position.
+            releaseKeys(mc);
+            return;
+        }
+        if (!SmartPath.walkable(mc, step)) {
+            routeCache = null;
             releaseKeys(mc);
             return;
         }
