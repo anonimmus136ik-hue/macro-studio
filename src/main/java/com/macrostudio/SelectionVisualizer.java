@@ -56,8 +56,9 @@ public final class SelectionVisualizer {
         if (mc.player.distanceToSqr(midX, mc.player.getY(), midZ) > 128.0 * 128.0) return;
 
         int opacity = Math.max(10, Math.min(75, s.overlayOpacity));
-        int fillRed = (opacity << 24) | 0xF36879;
-        int fillGreen = ((opacity * 3 / 4) << 24) | 0x36E4AD;
+        int alpha = opacity * 255 / 100;
+        int fillRed = (alpha << 24) | 0xF36879;
+        int fillGreen = ((alpha * 3 / 4) << 24) | 0x36E4AD;
         if (s.selectionVisuals) {
             Gizmos.cuboid(new AABB(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1),
                 GizmoStyle.strokeAndFill(RED, 2.2f, fillRed));
@@ -72,37 +73,42 @@ public final class SelectionVisualizer {
 
         int aroundX = mc.player.blockPosition().getX();
         int aroundZ = mc.player.blockPosition().getZ();
-        int xmin = Math.max(minX, aroundX - range), xmax = Math.min(maxX, aroundX + range);
-        int zmin = Math.max(minZ, aroundZ - range), zmax = Math.min(maxZ, aroundZ + range);
         int count = 0;
-        // Cap to 240 cells to keep 3D overlays usable on weak GPUs.
+        // Nearest-first rings show relevant cells at the player's position before distant ones.
         if (s.showDemolitionCells) {
-            for (int y = minY; y <= maxY && count < 240; y++)
-                for (int z = zmin; z <= zmax && count < 240; z++)
-                    for (int x = xmin; x <= xmax && count < 240; x++) {
-                        if ((x - aroundX) * (x - aroundX) + (z - aroundZ) * (z - aroundZ) > range * range)
+            for (int ring = 0; ring <= range && count < 240; ring++)
+                for (int dz = -ring; dz <= ring && count < 240; dz++)
+                    for (int dx = -ring; dx <= ring && count < 240; dx++) {
+                        if (Math.max(Math.abs(dx),Math.abs(dz)) != ring || dx*dx + dz*dz > range*range)
                             continue;
-                        BlockPos p = new BlockPos(x, y, z);
-                        // This is the player's chosen excavation volume, not an ore scanner.
-                        if (!mc.level.hasChunkAt(p) || mc.level.getBlockState(p).isAir()) continue;
-                        Gizmos.cuboid(p, GizmoStyle.stroke(RED, 1.0f));
-                        count++;
+                        int x = aroundX + dx, z = aroundZ + dz;
+                        if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+                        for (int layer = 0; layer < depth && count < 240; layer++) {
+                            int y = s.digUp ? originY + layer : originY - layer;
+                            BlockPos p = new BlockPos(x, y, z);
+                            if (!mc.level.hasChunkAt(p) || mc.level.getBlockState(p).isAir()) continue;
+                            Gizmos.cuboid(p, GizmoStyle.stroke(RED, 1.0f));
+                            count++;
+                        }
                     }
         }
-        // Safe places to stand, using only loaded ground, not a projected path through holes.
         if (s.showWalkableCells) {
             int feetY = mc.player.blockPosition().getY();
             int walked = 0;
-            for (int z = zmin; z <= zmax && walked < 140; z++)
-                for (int x = xmin; x <= xmax && walked < 140; x++) {
-                    if ((x - aroundX) * (x - aroundX) + (z - aroundZ) * (z - aroundZ) > range * range)
-                        continue;
-                    BlockPos feet = new BlockPos(x, feetY, z);
-                    if (!SmartPath.walkable(mc, feet)) continue;
-                    Gizmos.cuboid(new AABB(x + .06, feetY - .04, z + .06, x + .94, feetY + .03, z + .94),
-                            GizmoStyle.strokeAndFill(EMERALD, 1.2f, fillGreen));
-                    walked++;
-                }
+            for (int ring = 0; ring <= range && walked < 140; ring++)
+                for (int dz = -ring; dz <= ring && walked < 140; dz++)
+                    for (int dx = -ring; dx <= ring && walked < 140; dx++) {
+                        if (Math.max(Math.abs(dx),Math.abs(dz)) != ring || dx*dx + dz*dz > range*range)
+                            continue;
+                        int x = aroundX + dx, z = aroundZ + dz;
+                        if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+                        BlockPos feet = new BlockPos(x, feetY, z);
+                        if (!SmartPath.walkable(mc, feet)) continue;
+                        Gizmos.cuboid(new AABB(x + .06, feetY - .04, z + .06,
+                                        x + .94, feetY + .03, z + .94),
+                                GizmoStyle.strokeAndFill(EMERALD, 1.2f, fillGreen));
+                        walked++;
+                    }
         }
         Gizmos.cuboid(new BlockPos(a[0], a[1], a[2]), GizmoStyle.stroke(GOLD, 3f));
         Gizmos.cuboid(new BlockPos(b[0], b[1], b[2]), GizmoStyle.stroke(GOLD, 3f));
