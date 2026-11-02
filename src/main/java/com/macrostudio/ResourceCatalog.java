@@ -4,6 +4,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Inventory-only resource filter: never examines unknown or hidden world blocks.
@@ -21,6 +23,19 @@ public final class ResourceCatalog {
         {Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.STONE}
     };
     private ResourceCatalog() {}
+
+    /** Classifies a single mining target only; never queries or searches the world. */
+    public static boolean matchesSelectedBlock(BlockState block) {
+        if (block == null || block.isAir()) return false;
+        return (selected(0) && (block.is(Blocks.DIAMOND_ORE) || block.is(Blocks.DEEPSLATE_DIAMOND_ORE)))
+            || (selected(1) && (block.is(Blocks.EMERALD_ORE) || block.is(Blocks.DEEPSLATE_EMERALD_ORE)))
+            || (selected(2) && (block.is(Blocks.GOLD_ORE) || block.is(Blocks.DEEPSLATE_GOLD_ORE)))
+            || (selected(3) && (block.is(Blocks.IRON_ORE) || block.is(Blocks.DEEPSLATE_IRON_ORE)))
+            || (selected(4) && (block.is(Blocks.REDSTONE_ORE) || block.is(Blocks.DEEPSLATE_REDSTONE_ORE)))
+            || (selected(5) && (block.is(Blocks.COAL_ORE) || block.is(Blocks.DEEPSLATE_COAL_ORE)))
+            || (selected(6) && (block.is(Blocks.STONE) || block.is(Blocks.DEEPSLATE)
+                    || block.is(Blocks.COBBLESTONE) || block.is(Blocks.COBBLED_DEEPSLATE)));
+    }
 
     public static boolean matches(ItemStack stack, int type) {
         if (stack == null || stack.isEmpty() || type < 0 || type >= GROUPS.length) return false;
