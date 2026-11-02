@@ -31,6 +31,7 @@ public final class Settings {
     /** Preview options: no automatic server interactions. */
     public boolean selectionVisuals = true;
     public boolean showActiveLayer = true;
+    public boolean showRoute = false;
     public boolean drillPreview = false;
     public boolean digUp = false;
     /** Window percentage of available GUI width, not global Minecraft GUI scale. */
