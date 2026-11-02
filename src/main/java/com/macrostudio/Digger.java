@@ -372,7 +372,7 @@ public final class Digger {
         long worldTime = mc.level.getGameTime();
         if (routeCache == null || routeForIndex != index || routeAtTick < 0
                 || worldTime < routeAtTick || worldTime - routeAtTick > 12) {
-            routeCache = SmartPath.toMiningColumn(mc, cell[0], cell[1]);
+            routeCache = SmartPath.toMiningColumn(mc, currentBlock);
             routeForIndex = index;
             routeAtTick = worldTime;
         }
