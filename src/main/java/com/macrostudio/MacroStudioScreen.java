@@ -56,7 +56,7 @@ public final class MacroStudioScreen extends Screen {
     private record UiButton(Button button, String caption, Tone tone, boolean content) {}
 
     public MacroStudioScreen() {
-        super(Component.literal("Macro Studio MAX 2.2.0"));
+        super(Component.literal("Macro Studio MAX 2.3.0"));
         Minecraft mc = Minecraft.getInstance();
         if (mc.hitResult instanceof BlockHitResult hit && mc.hitResult.getType() == HitResult.Type.BLOCK) {
             lookedPos = new int[] {hit.getBlockPos().getX(), hit.getBlockPos().getY(), hit.getBlockPos().getZ()};
@@ -486,7 +486,7 @@ public final class MacroStudioScreen extends Screen {
         build();
     }
 
-    private static String toggle(String name, boolean on) { return name + (on ? "   [ON]" : "   [OFF]"); }
+    private static String toggle(String name, boolean on) { return (on ? "[x] " : "[ ] ") + name; }
     private static String cut(String s, int len) { return s.length() > len ? s.substring(0, len - 2) + ".." : s; }
     private static String point(int[] p) { return p == null || p.length < 3 ? "NOT SET" : p[0] + "  /  " + p[1] + "  /  " + p[2]; }
 
@@ -588,7 +588,7 @@ public final class MacroStudioScreen extends Screen {
                 line(g, "AUTOMATION / INSTALLED MODULES", x, y, TEAL);
                 line(g, "Food threshold: " + Settings.I.eatBelow + " / 20", x, y + 149, GOLD);
                 line(g, "Only real modules have ON/OFF controls.", x, y + 253, GREY);
-                line(g, "Auto Fish / Farm / Build are not installed yet.", x, y + 267, GREY);
+                line(g, "Auto Fish / Farm are not installed.", x, y + 267, GREY);
             }
             case MACROS -> {
                 line(g, "MACRO LIBRARY", x, y, TEAL);
@@ -625,10 +625,10 @@ public final class MacroStudioScreen extends Screen {
         super.render(g, mouseX, mouseY, partialTick);
         line(g, "M", px + 16, py + 18, TEAL);
         line(g, "MACRO STUDIO", px + side + 15, py + 16, WHITE);
-        line(g, "MAX 2.2  /  1.21.11", px + side + 15, py + 29, GREY);
+        line(g, "MAX 2.3  /  1.21.11", px + side + 15, py + 29, GREY);
         line(g, Recorder.active ? "REC" : Digger.active ? (Digger.isPaused() ? "PAUSED" : "MINING") : "READY",
                 px + pw - 110, py + 19, Recorder.active ? RED : Digger.active ? TEAL : GREY);
-        line(g, "v2.2.0", px + 15, py + ph - 20, GREY);
+        line(g, "v2.3.0  |  3D", px + 15, py + ph - 20, GREY);
         drawPage(g);
         // Custom skinned clickable widgets (native buttons are visually transparent).
         for (UiButton ui : paintedButtons) {
