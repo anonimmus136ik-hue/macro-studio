@@ -301,8 +301,8 @@ public final class MacroStudioScreen extends Screen {
         addRenderableWidget(price);
         button("COPY /market sell " + s.marketPrice, x, y + 213, w, 30, Tone.PRIMARY, b -> {
             Minecraft mc = Minecraft.getInstance();
-            if (mc.player == null || mc.player.getMainHandItem().getCount() < 64) {
-                Recorder.msg("Hold a complete 64-stack first");
+            if (mc.player == null || !ResourceCatalog.eligibleForMarket(mc.player.getMainHandItem())) {
+                Recorder.msg("Hold 64 allowed items from your selected resource filter");
                 return;
             }
             mc.keyboardHandler.setClipboard("/market sell " + s.marketPrice);
