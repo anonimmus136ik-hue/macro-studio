@@ -28,7 +28,7 @@ public class MacroStudioMod implements ClientModInitializer {
             worldAnnounced = false;
         } else if (!worldAnnounced) {
             worldAnnounced = true;
-            Recorder.msg("Macro Studio MAX 2.2.0 загружен — Right Ctrl открывает меню");
+            Recorder.msg("Macro Studio MAX 2.3.0 загружен — Right Ctrl открывает меню");
         }
 		Set<Integer> down = Keys.pollDown();
 		Set<Integer> pressed = new HashSet<>(down);
