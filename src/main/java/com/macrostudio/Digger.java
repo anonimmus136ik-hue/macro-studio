@@ -336,6 +336,7 @@ public final class Digger {
             mc.options.keyUp.setDown(false);
             mc.options.keyJump.setDown(false);
             mc.options.keySprint.setDown(false);
+            if (Settings.I.drillAssist) DrillAssist.select(mc, target);
             boolean aligned = aim(mc, target);
             boolean hit = aligned && unobstructed(mc, target) && actualAimHits(mc, target);
             mc.options.keyAttack.setDown(hit);
