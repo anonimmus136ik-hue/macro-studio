@@ -50,6 +50,7 @@ jobs:
           unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/SmartPath.class'
           unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/SelectionVisualizer.class'
           unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/ResourceCatalog.class'
+          unzip -Z -1 "$JAR" | grep -q 'com/macrostudio/DrillAssist.class'
           sha256sum "$JAR"
 
       - name: Upload single current JAR
