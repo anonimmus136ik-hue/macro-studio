@@ -28,9 +28,9 @@ The Gradle wrapper uses Java 25 for Fabric Loom; the mod's class bytecode is Jav
 - **No automatic block placement** is implemented in this version.
 
 ### Market & resources
-- Resource selection and **real inventory totals** for diamonds, emeralds, gold ingots, iron ingots, redstone, coal, cobblestone.
+- Resource selection and **real inventory totals** for diamonds, emeralds, gold, iron, redstone, coal and stone including raw/ingot/ore variants from loaded inventory.
 - Optional inventory resource counter HUD.
-- Price controls and **manual copy** of `/market sell PRICE`, only while holding a complete stack of 64 items. The player checks the price and submits the chat command themselves.
+- Price controls and **manual copy** of `/market sell PRICE`, only while holding a complete stack of 64 eligible, selected resource items (not tools or other valuables). The player checks the price and submits the chat command themselves.
 - No automatic selling, teleporting to warps, X-Ray, container manipulation or server-side market API integration.
 
 ### Obsidian UI
@@ -43,7 +43,7 @@ The Gradle wrapper uses Java 25 for Fabric Loom; the mod's class bytecode is Jav
 
 The A* walker only considers **horizontal, currently loaded and walkable surfaces**, with solid floor and enough headroom. It intentionally does not bridge, fly, jump holes, teleport or mine inaccessible targets. Upward mining needs a stable reachable position (scaffolding is not created). Verify any server's rules before enabling automation. Some multiplayer servers prohibit mining bots and automatic market listings.
 
-The drill footprint visualization does **not** establish which server-specific blocks a custom drill will break; that requires knowing the drill's actual item behavior and testing on a server that allows automation. This is not a compatibility claim for ReallyWorld's proprietary mechanics.
+Save custom drill with **Smart Route → SAVE HELD AS DRILL** and choose a matching block type using **SET LOOKED BLOCK TYPE**, then enable **DRILL TOOL ASSIST**. These settings identify a tool; they do not discover private server recipes or synchronize proprietary 3×3×2 effects.\n\nThe drill footprint visualization does **not** establish which server-specific blocks a custom drill will break; that requires knowing the drill's actual item behavior and testing on a server that allows automation. This is not a compatibility claim for ReallyWorld's proprietary mechanics.
 
 **A green GitHub build confirms compilation only.** Test the rendered outlines, Digger route safety, settings layout and Minecraft startup in an actual world before calling the mod production ready.
 
