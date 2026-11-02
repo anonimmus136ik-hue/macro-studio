@@ -36,6 +36,9 @@ public final class Settings {
     /** Window percentage of available GUI width, not global Minecraft GUI scale. */
     public int uiWidthPercent = 84;
     public int uiHeightPercent = 90;
+    public boolean buildPreview = false;
+    /** 0 floor, 1 walls, 2 fill. Preview only. */
+    public int buildMode = 0;
     public boolean marketAssistant = false;
     public int marketPrice = 400;
     public boolean[] resourceFilter = {true, true, true, true, true, true, true};
