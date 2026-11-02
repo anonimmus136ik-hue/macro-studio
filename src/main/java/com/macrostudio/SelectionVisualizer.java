@@ -46,7 +46,7 @@ public final class SelectionVisualizer {
 
         int minX = Math.min(a[0], b[0]), maxX = Math.max(a[0], b[0]);
         int minZ = Math.min(a[2], b[2]), maxZ = Math.max(a[2], b[2]);
-        int originY = Math.max(a[1], b[1]);
+        int originY = s.digUp ? Math.min(a[1], b[1]) : Math.max(a[1], b[1]);
         int d = Math.max(1, Math.min(32, s.digDepth));
         int minY = s.digUp ? originY : originY - d + 1;
         int maxY = s.digUp ? originY + d - 1 : originY;
